@@ -52,23 +52,25 @@ function compile(markdown, config = {}) {
         frontmatter: result.frontmatter,
         headings: result.headings,
         config: defaults,
+        buildHash: 'live',
         siteTitle: defaults.siteTitle,
         pageTitle: result.frontmatter.title || 'Untitled',
         description: result.frontmatter.description || '',
         defaultMode: defaults.theme.defaultMode,
-        
-        // Navigation Stub (Empty for single page preview)
+
+        // Navigation Stub
         navigationHtml: '', 
         relativePathToRoot: './', 
         outputPath: 'index.html',
         currentPagePath: '/index',
-        prevPage: null, nextPage: null,
-        
+        prevPage: null,
+        nextPage: null,
+
         // Inject the constructed assets
         pluginHeadScriptsHtml: cssTags.join('\n'), 
         pluginBodyScriptsHtml: jsTags.join('\n'),
         themeInitScript: themeInitScript,
-        
+
         // Helpers
         faviconLinkHtml: '', 
         logo: defaults.logo, 

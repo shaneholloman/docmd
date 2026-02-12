@@ -42,7 +42,7 @@ program
   .action(async () => {
     try {
       await buildLive();
-      // ... (Add the spawn 'serve' logic here from the backup if desired)
+
     } catch (e) {
       console.error(e);
       process.exit(1);
