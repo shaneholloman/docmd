@@ -18,16 +18,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # pnpm for dev workflow
       - name: Install pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 9
 
+      # Setup Node + npm registry for OIDC
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
           cache: 'pnpm'
+
+      # Ensure latest npm (future-proofing workspace semantics)
+      - name: Upgrade npm
+        run: npm install -g npm@latest
+
+      - name: Verify versions
+        run: |
+          node -v
+          npm -v
+          pnpm -v
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
@@ -42,26 +55,15 @@ jobs:
         run: |
           find packages -mindepth 1 -maxdepth 2 -name "package.json" -exec dirname {} \; | xargs -I % cp LICENSE %
 
-      # --- 2. Publish to NPM ---
-      # - name: Setup .npmrc for NPMJS
-      #  run: |
-      #    echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > .npmrc
-          
-      - name: Publish to NPM
-        run: npm publish --workspaces --access public
-        # env:
-        #  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # ---------- Publish to npmjs via OIDC ----------
+      - name: Publish to NPM (OIDC)
+        run: npm publish --workspaces --include-workspace-root=false --access public
 
-      # --- 3. Publish to GitHub Packages ---
-      # We must clean the previous .npmrc and setup for GPR
+      # ---------- Publish to GitHub Packages ----------
       - name: Setup .npmrc for GitHub Packages
         run: |
           echo "@docmd:registry=https://npm.pkg.github.com" > .npmrc
           echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" >> .npmrc
 
       - name: Publish to GitHub Packages
-        # We use --no-git-checks because the tag already exists from the NPM publish step
-        # We might need 'continue-on-error' if versions already exist
-        run: pnpm -r publish --access public --no-git-checks || true
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm publish --workspaces --include-workspace-root=false --access public || true
