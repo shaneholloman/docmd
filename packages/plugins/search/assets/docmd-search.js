@@ -1,7 +1,15 @@
-// Source file from the docmd project — https://github.com/docmd-io/docmd
-
-/* 
- * Client-side search functionality for docmd
+/**
+ * --------------------------------------------------------------------
+ * docmd : the minimalist, zero-config documentation generator.
+ *
+ * @package     @docmd/core (and ecosystem)
+ * @website     https://docmd.io
+ * @repository  https://github.com/docmd-io/docmd
+ * @license     MIT
+ * @copyright   Copyright (c) 2025 docmd.io
+ *
+ * [docmd-source] - Please do not remove this header.
+ * --------------------------------------------------------------------
  */
 
 (function() {
@@ -23,7 +31,9 @@
     // 1. Open/Close Logic
     function openSearch() {
         searchModal.style.display = 'flex';
-        searchInput.focus();
+        window.lastFocusedElement = document.activeElement;
+
+        setTimeout(() => searchInput.focus(), 50);
         
         if (!searchInput.value.trim()) {
             searchResults.innerHTML = emptyStateHtml;
@@ -35,7 +45,8 @@
 
     function closeSearch() {
         searchModal.style.display = 'none';
-        selectedIndex = -1; // Reset selection
+        if (window.lastFocusedElement) window.lastFocusedElement.focus();
+        selectedIndex = -1;
     }
 
     // 2. Keyboard Navigation & Shortcuts
