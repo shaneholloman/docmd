@@ -15,48 +15,50 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Checkout repository
       - name: Checkout
         uses: actions/checkout@v6
 
-      # pnpm for dev workflow
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      # Setup Node + npm registry for OIDC
-      - name: Setup Node
+      # Setup Node.js with pnpm cache enabled
+      - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
           cache: 'pnpm'
 
-      # Ensure latest npm (future-proofing workspace semantics)
-      - name: Upgrade npm
-        run: npm install -g npm@latest
+      # Enable Corepack (this activates pnpm from packageManager field)
+      - name: Enable Corepack
+        run: corepack enable
 
+      # Verify toolchain versions (debug safety)
       - name: Verify versions
         run: |
-          node -v
+          node -v        # should be v22.x
           npm -v
-          pnpm -v
+          pnpm -v        # should be 10.29.3 automatically
 
-      - name: Install Dependencies
+      # Install dependencies using locked versions
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build Packages
+      # Build all workspace packages
+      - name: Build packages
         run: pnpm -r run build
 
-      - name: Run Tests
+      # Run failsafe tests
+      - name: Run tests
         run: node scripts/failsafe.js
 
+      # Copy LICENSE into each package
       - name: Copy LICENSE
         run: |
           find packages -mindepth 1 -maxdepth 2 -name "package.json" -exec dirname {} \; | xargs -I % cp LICENSE %
 
+      # Resolve workspace dependency versions before publish
       - name: Resolve workspace dependencies
         run: node scripts/resolve-ws-deps.js
 
-      - name: Publish to NPM (OIDC)
+      # Publish to npm using Trusted Publishing (OIDC)
+      - name: Publish to npm
         run: npm publish --workspaces --include-workspace-root=false --access public
