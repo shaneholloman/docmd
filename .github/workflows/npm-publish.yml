@@ -22,8 +22,6 @@ jobs:
       # Install exact pnpm version (matches package.json)
       - name: Install pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       # Setup Node.js with pnpm cache
       - name: Setup Node.js
