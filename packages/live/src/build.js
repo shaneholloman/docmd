@@ -126,6 +126,15 @@ async function build() {
         await copy(path.join(ui.getAssetsDir(), 'css/docmd-highlight-dark.css'), 'docmd-highlight-dark.css');
         await copy(path.join(ui.getAssetsDir(), 'js/docmd-main.js'), 'docmd-main.js');
 
+        // Copy Mermaid Assets
+        const mermaidPkgPath = require.resolve('@docmd/plugin-mermaid/package.json');
+        const mermaidDir = path.dirname(mermaidPkgPath);
+        const mermaidSrc = path.join(mermaidDir, 'assets', 'init-mermaid.js');
+        await fs.copyFile(
+            mermaidSrc, 
+            path.join(jsDest, 'init-mermaid.js')
+        );
+
         // Theme Assets (Source: sky.css -> Dest: docmd-theme-sky.css)
         const themesDir = themes.getThemesDir();
         const themeFiles = await fs.readdir(themesDir);

@@ -14,8 +14,25 @@
 
 /* Always hide TOC and Footer Actions in preview to save space */
 .toc-sidebar,
-.page-footer-actions {
+.page-footer-actions,
+.sidebar-header h1 {
     display: none !important;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.main-content-wrapper {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.content-area {
+    flex: 1; /* Pushes footer down */
 }
 
 /* Ensure the main content takes full width since TOC is gone */
