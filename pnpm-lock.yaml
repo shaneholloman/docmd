@@ -114,20 +114,23 @@ importers:
         specifier: ^14.1.1
         version: 14.1.1
       markdown-it-abbr:
-        specifier: ^2.0.0
-        version: 2.0.0
+        specifier: ^1.0.4
+        version: 1.0.4
       markdown-it-attrs:
         specifier: ^4.1.6
         version: 4.3.1(markdown-it@14.1.1)
       markdown-it-container:
-        specifier: ^4.0.0
-        version: 4.0.0
-      markdown-it-deflist:
         specifier: ^3.0.0
         version: 3.0.0
+      markdown-it-deflist:
+        specifier: ^2.1.0
+        version: 2.1.0
+      markdown-it-emoji:
+        specifier: ^2.0.2
+        version: 2.0.2
       markdown-it-footnote:
-        specifier: ^4.0.0
-        version: 4.0.0
+        specifier: ^3.0.3
+        version: 3.0.3
       markdown-it-task-lists:
         specifier: ^2.1.1
         version: 2.1.1
@@ -970,8 +973,8 @@ packages:
   lucide-static@0.563.0:
     resolution: {integrity: sha512-O7ZlK+VFfc/G5KYwUb9jO60RlPNKV6Dyu+OgQC/QCiO4FMPIK9qrIIkYHHG6PLgLKvmELmf1eKSAso+D/vAvcg==}
 
-  markdown-it-abbr@2.0.0:
-    resolution: {integrity: sha512-of7C8pXSjXjDojW4neNP+jD7inUYH/DO0Ca+K/4FUEccg0oHAEX/nfscw0jfz66PJbYWOAT9U8mjO21X5p6aAw==}
+  markdown-it-abbr@1.0.4:
+    resolution: {integrity: sha512-ZeA4Z4SaBbYysZap5iZcxKmlPL6bYA8grqhzJIHB1ikn7njnzaP8uwbtuXc4YXD5LicI4/2Xmc0VwmSiFV04gg==}
 
   markdown-it-attrs@4.3.1:
     resolution: {integrity: sha512-/ko6cba+H6gdZ0DOw7BbNMZtfuJTRp9g/IrGIuz8lYc/EfnmWRpaR3CFPnNbVz0LDvF8Gf1hFGPqrQqq7De0rg==}
@@ -979,14 +982,17 @@ packages:
     peerDependencies:
       markdown-it: '>= 9.0.0'
 
-  markdown-it-container@4.0.0:
-    resolution: {integrity: sha512-HaNccxUH0l7BNGYbFbjmGpf5aLHAMTinqRZQAEQbMr2cdD3z91Q6kIo1oUn1CQndkT03jat6ckrdRYuwwqLlQw==}
+  markdown-it-container@3.0.0:
+    resolution: {integrity: sha512-y6oKTq4BB9OQuY/KLfk/O3ysFhB3IMYoIWhGJEidXt1NQFocFK2sA2t0NYZAMyMShAGL6x5OPIbrmXPIqaN9rw==}
 
-  markdown-it-deflist@3.0.0:
-    resolution: {integrity: sha512-OxPmQ/keJZwbubjiQWOvKLHwpV2wZ5I3Smc81OjhwbfJsjdRrvD5aLTQxmZzzePeO0kbGzAo3Krk4QLgA8PWLg==}
+  markdown-it-deflist@2.1.0:
+    resolution: {integrity: sha512-3OuqoRUlSxJiuQYu0cWTLHNhhq2xtoSFqsZK8plANg91+RJQU1ziQ6lA2LzmFAEes18uPBsHZpcX6We5l76Nzg==}
 
-  markdown-it-footnote@4.0.0:
-    resolution: {integrity: sha512-WYJ7urf+khJYl3DqofQpYfEYkZKbmXmwxQV8c8mO/hGIhgZ1wOe7R4HLFNwqx7TjILbnC98fuyeSsin19JdFcQ==}
+  markdown-it-emoji@2.0.2:
+    resolution: {integrity: sha512-zLftSaNrKuYl0kR5zm4gxXjHaOI3FAOEaloKmRA5hijmJZvSjmxcokOLlzycb/HXlUFWzXqpIEoyEMCE4i9MvQ==}
+
+  markdown-it-footnote@3.0.3:
+    resolution: {integrity: sha512-YZMSuCGVZAjzKMn+xqIco9d1cLGxbELHZ9do/TSYVzraooV8ypsppKNmUJ0fVH5ljkCInQAtFpm8Rb3eXSrt5w==}
 
   markdown-it-task-lists@2.1.1:
     resolution: {integrity: sha512-TxFAc76Jnhb2OUu+n3yz9RMu4CwGfaT788br6HhEDlvWfdeJcLUsxk1Hgw2yJio0OXsxv7pyIPmvECY7bMbluA==}
@@ -1956,17 +1962,19 @@ snapshots:
 
   lucide-static@0.563.0: {}
 
-  markdown-it-abbr@2.0.0: {}
+  markdown-it-abbr@1.0.4: {}
 
   markdown-it-attrs@4.3.1(markdown-it@14.1.1):
     dependencies:
       markdown-it: 14.1.1
 
-  markdown-it-container@4.0.0: {}
+  markdown-it-container@3.0.0: {}
 
-  markdown-it-deflist@3.0.0: {}
+  markdown-it-deflist@2.1.0: {}
 
-  markdown-it-footnote@4.0.0: {}
+  markdown-it-emoji@2.0.2: {}
+
+  markdown-it-footnote@3.0.3: {}
 
   markdown-it-task-lists@2.1.1: {}
 
