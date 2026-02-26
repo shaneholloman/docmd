@@ -17,14 +17,14 @@ function buttonRule(state, startLine, endLine, silent) {
   const max = state.eMarks[startLine];
   const lineContent = state.src.slice(start, max);
 
-  // 1. Regex to catch ::: button ...
+  // Regex to catch ::: button ...
   // Matches: ::: button "Text Here" link ...
   const match = lineContent.match(/^:::\s+button\s+(?:["'](.*?)["']|(\S+))\s+(.*)$/);
 
   if (!match) return false;
   if (silent) return true;
 
-  // 2. Extract Data
+  // Extract Data
   // Group 1 is quoted text, Group 2 is single-word text
   let text = match[1] || match[2] || 'Button';
   // Replace underscores only if it was a single word (legacy support)
@@ -32,7 +32,7 @@ function buttonRule(state, startLine, endLine, silent) {
   
   const rest = match[3].trim();
   
-  // 3. Parse Link and Options
+  // Parse Link and Options
   // We look for the first string as the link, rest as options
   const parts = rest.split(/\s+/);
   let rawLink = parts[0];
@@ -45,7 +45,7 @@ function buttonRule(state, startLine, endLine, silent) {
       }
   }
 
-  // 4. Handle Link Types
+  // Handle Link Types
   let href = rawLink;
   let isExternal = false;
   
@@ -59,7 +59,7 @@ function buttonRule(state, startLine, endLine, silent) {
       isExternal = true;
   }
 
-  // 5. Generate Token
+  // Generate Token
   const token = state.push('html_inline', '', 0);
   
   let styleAttr = '';

@@ -12,55 +12,108 @@
  * --------------------------------------------------------------------
  */
 
-const container = require('markdown-it-container');
+function createDepthTrackingContainer(md, name, renderOpen, renderClose) {
+  md.block.ruler.before('fence', `custom_${name}`, (state, startLine, endLine, silent) => {
+    const start = state.bMarks[startLine] + state.tShift[startLine];
+    const max = state.eMarks[startLine];
+    const lineContent = state.src.slice(start, max).trim();
+
+    // Match opening tag e.g., `::: callout info Title`
+    const regex = new RegExp(`^:::\\s+${name}(?:\\s+(.*))?$`);
+    const match = lineContent.match(regex);
+    if (!match) return false;
+    if (silent) return true;
+
+    let nextLine = startLine;
+    let found = false;
+    let depth = 1;
+    let inFence = false;
+
+    while (nextLine < endLine) {
+      nextLine++;
+      if (nextLine >= endLine) break;
+
+      const nextStart = state.bMarks[nextLine] + state.tShift[nextLine];
+      const nextMax = state.eMarks[nextLine];
+      const nextContent = state.src.slice(nextStart, nextMax).trim();
+      
+      // Ignore content inside code blocks
+      if (/^(\s{0,3})(~{3,}|`{3,})/.test(nextContent)) inFence = !inFence;
+
+      if (!inFence) {
+        if (nextContent.match(/^:::\s+[a-zA-Z]/) && !nextContent.match(/^:::\s+button/)) {
+          depth++; // Nested container opened
+        } else if (nextContent.match(/^:::\s*$/)) {
+          depth--; // Container closed
+          if (depth === 0) {
+            found = true;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!found) return false;
+
+    const info = match[1] || '';
+    
+    const openToken = state.push(`custom_${name}_open`, 'div', 1);
+    openToken.info = info;
+
+    const oldParentType = state.parentType;
+    const oldLineMax = state.lineMax;
+    state.parentType = 'container';
+    state.lineMax = nextLine;
+
+    // Tokenize inside the container
+    state.md.block.tokenize(state, startLine + 1, nextLine);
+
+    const closeToken = state.push(`custom_${name}_close`, 'div', -1);
+
+    state.parentType = oldParentType;
+    state.lineMax = oldLineMax;
+    state.line = nextLine + 1;
+    return true;
+  }, { alt: ['paragraph', 'reference', 'blockquote', 'list'] });
+
+  // Register Renderers
+  md.renderer.rules[`custom_${name}_open`] = renderOpen;
+  md.renderer.rules[`custom_${name}_close`] = renderClose;
+}
 
 module.exports = {
   name: 'common-containers',
   setup(md) {
+    
     // 1. Callout
-    md.use(container, 'callout', {
-      render: (tokens, idx) => {
-        if (tokens[idx].nesting === 1) {
-          const info = tokens[idx].info.trim();
-          const parts = info.split(' ');
-          const type = parts[1] || 'info'; 
-          const title = parts.slice(2).join(' ');
-          return `<div class="docmd-container callout callout-${type}">${title ? `<div class="callout-title">${title}</div>` : ''}<div class="callout-content">\n`;
-        }
-        return '</div></div>\n';
-      }
-    });
+    createDepthTrackingContainer(md, 'callout', (tokens, idx) => {
+      const info = tokens[idx].info.trim();
+      const parts = info.split(' ');
+      const type = parts[0] || 'info'; 
+      const title = parts.slice(1).join(' ');
+      return `<div class="docmd-container callout callout-${type}">${title ? `<div class="callout-title">${title}</div>` : ''}<div class="callout-content">\n`;
+    }, () => '</div></div>\n');
 
     // 2. Card
-    md.use(container, 'card', {
-      render: (tokens, idx) => {
-        if (tokens[idx].nesting === 1) {
-          const title = tokens[idx].info.replace('card', '').trim();
-          return `<div class="docmd-container card">${title ? `<div class="card-title">${title}</div>` : ''}<div class="card-content">\n`;
-        }
-        return '</div></div>\n';
-      }
-    });
+    createDepthTrackingContainer(md, 'card', (tokens, idx) => {
+      const title = tokens[idx].info.trim();
+      return `<div class="docmd-container card">${title ? `<div class="card-title">${title}</div>` : ''}<div class="card-content">\n`;
+    }, () => '</div></div>\n');
 
     // 3. Collapsible
-    md.use(container, 'collapsible', {
-      render: (tokens, idx) => {
-        if (tokens[idx].nesting === 1) {
-          const info = tokens[idx].info.replace('collapsible', '').trim();
-          // Check for "open" keyword
-          const isOpen = info.startsWith('open ') || info === 'open';
-          const title = isOpen ? info.replace('open', '').trim() : info;
-          const displayTitle = title || 'Click to expand';
-          
-          return `<details class="docmd-container collapsible" ${isOpen ? 'open' : ''}>
-            <summary class="collapsible-summary">
-                <span class="collapsible-title">${displayTitle}</span>
-                <span class="collapsible-arrow"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span>
-            </summary>
-            <div class="collapsible-content">\n`;
-        }
-        return '</div></details>\n';
-      }
-    });
+    createDepthTrackingContainer(md, 'collapsible', (tokens, idx) => {
+      const info = tokens[idx].info.trim();
+      const isOpen = info.startsWith('open ') || info === 'open';
+      const title = isOpen ? info.replace('open', '').trim() : info;
+      const displayTitle = title || 'Click to expand';
+      
+      return `<details class="docmd-container collapsible" ${isOpen ? 'open' : ''}>
+        <summary class="collapsible-summary">
+            <span class="collapsible-title">${displayTitle}</span>
+            <span class="collapsible-arrow"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span>
+        </summary>
+        <div class="collapsible-content">\n`;
+    }, () => '</div></details>\n');
+
   }
 };

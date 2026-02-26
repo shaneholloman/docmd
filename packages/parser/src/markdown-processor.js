@@ -27,33 +27,45 @@ const emoji = require('markdown-it-emoji');
 // The Feature Registry
 const { registerFeatures } = require('./features');
 
-// Custom Heading ID Logic (Internal helper)
+// Custom Heading ID & Anchor Logic
 const headingIdPlugin = (md) => {
-  const originalHeadingOpen = md.renderer.rules.heading_open || function(tokens, idx, options, env, self) {
-    return self.renderToken(tokens, idx, options);
-  };
+  md.core.ruler.push('heading_anchors', function(state) {
+    for (let i = 0; i < state.tokens.length; i++) {
+      const token = state.tokens[i];
+      
+      if (token.type === 'heading_open') {
+        const level = parseInt(token.tag.slice(1), 10);
+        const inlineToken = state.tokens[i + 1];
+        
+        // 1. Generate ID if not present
+        let id = token.attrGet('id');
+        if (!id && inlineToken && inlineToken.content) {
+          id = inlineToken.content
+            .toLowerCase()
+            .replace(/\s+/g, '-')
+            .replace(/[^\w\u4e00-\u9fa5-]+/g, '')
+            .replace(/--+/g, '-')
+            .replace(/^-+/, '')
+            .replace(/-+$/, '');
+          if (id) token.attrSet('id', id);
+        }
 
-  md.renderer.rules.heading_open = function(tokens, idx, options, env, self) {
-    const token = tokens[idx];
-    const existingId = token.attrGet('id');
+        // 2. Inject Hover Anchor as an HTML Token (for H2, H3, H4)
+        if (id && level >= 2 && level <= 4) {
+          let existingClass = token.attrGet('class') || '';
+          token.attrSet('class', `${existingClass} docmd-heading`.trim());
 
-    if (!existingId) {
-      const contentToken = tokens[idx + 1];
-      if (contentToken && contentToken.type === 'inline' && contentToken.content) {
-        const headingText = contentToken.content;
-        const id = headingText
-          .toLowerCase()
-          .replace(/\s+/g, '-')
-          .replace(/[^\w\u4e00-\u9fa5-]+/g, '')
-          .replace(/--+/g, '-')
-          .replace(/^-+/, '')
-          .replace(/-+$/, '');
-
-        if (id) token.attrSet('id', id);
+          if (inlineToken && inlineToken.children) {
+            const anchorToken = new state.Token('html_inline', '', 0);
+            anchorToken.content = `<a href="#${id}" class="heading-anchor" aria-label="Permalink to this section"><svg class="lucide-icon icon-link" width="0.8em" height="0.8em" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a>`;
+            
+            // Insert the anchor at the beginning of the heading text
+            inlineToken.children.unshift(anchorToken);
+          }
+        }
       }
     }
-    return originalHeadingOpen(tokens, idx, options, env, self);
-  };
+  });
 };
 
 // Main Factory Function to Create a Markdown Processor
