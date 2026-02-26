@@ -20,7 +20,7 @@ function markdownSetup(md) {
     const token = tokens[idx];
     const info = token.info.trim();
     if (info === 'mermaid') {
-      return `<div class="mermaid">${token.content}</div>`;
+      return `<div class="mermaid">${md.utils.escapeHtml(token.content)}</div>\n`;
     }
     return defaultFence(tokens, idx, options, env, self);
   };
