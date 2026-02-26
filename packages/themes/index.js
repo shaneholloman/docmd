@@ -19,6 +19,7 @@ const path = require('path');
  * @param {string} themeName - 'sky', 'retro', 'ruby'
  * @returns {string} Absolute path to css file
  */
+
 function getThemePath(themeName) {
   const cleanName = themeName.toLowerCase();
   // We point to src for now, or dist if you plan to add a build step later
