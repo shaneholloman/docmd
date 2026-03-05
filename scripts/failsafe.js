@@ -60,10 +60,15 @@ try {
     console.log('🚀 [2/8] Initializing Project...');
     runCmd(`node "${CLI_BIN}" init`, tempDir);
 
-    // 3. Inject Stress Tests (Deep Nesting & Deep Paths)
-    console.log('🧪 [3/8] Injecting Stress Tests...');
+    // 3. Inject Stress Tests, Versioning & Zero-Config Dirs
+    console.log('🧪 [3/8] Injecting Stress Tests & Versioning...');
     const docsDir = path.join(tempDir, 'docs');
+    const docsV1Dir = path.join(tempDir, 'docs-v1');
+    const zeroConfigDir = path.join(tempDir, 'zero-docs');
     
+    fs.mkdirSync(docsV1Dir, { recursive: true });
+    fs.mkdirSync(path.join(zeroConfigDir, 'docs', 'nested'), { recursive: true });
+
     const stressMd = `---
 title: "Stress Test"
 ---
@@ -79,6 +84,15 @@ title: "Stress Test"
     fs.mkdirSync(deepDir, { recursive: true });
     fs.writeFileSync(path.join(deepDir, 'deep.md'), '# Deep Content');
 
+    // V1 Content (For Versioning Test)
+    fs.writeFileSync(path.join(docsV1Dir, 'index.md'), '# V1 Home');
+    fs.writeFileSync(path.join(docsV1Dir, 'stress.md'), '# V1 Stress');
+
+    // Zero-Config Content (For Auto-Router Test)
+    fs.writeFileSync(path.join(zeroConfigDir, 'docs', 'index.md'), '# Zero Config Home\nWelcome to auto-router.');
+    fs.writeFileSync(path.join(zeroConfigDir, 'docs', 'nested', 'auto.md'), '# Auto Nested Page');
+
+    // 4. Create Paradigm Configs
     // 4. Create Paradigm Configs
     console.log('⚙️  [4/8] Creating Legacy & Modern Configs...');
     
@@ -94,11 +108,20 @@ title: "Stress Test"
     
     const modernConfig = `
       module.exports = {
-        siteTitle: 'Modern Test', siteUrl: 'https://test.com',
-        srcDir: 'docs', outputDir: 'site-modern',
+        title: 'Modern Test', url: 'https://test.com',
+        src: 'docs', out: 'site-modern',
+        versions: {
+          current: 'v2',
+          all:[
+            { id: 'v2', dir: 'docs', label: 'v2.x' },
+            { id: 'v1', dir: 'docs-v1', label: 'v1.x' }
+          ]
+        },
+        redirects: { '/old-guide': '/new-guide' },
+        notFound: { title: 'Custom 404', content: 'Page missing.' },
         layout: {
           optionsMenu: { position: 'header', components: { search: true, themeSwitch: true, sponsor: 'https://sponsor.com' } },
-          footer: { style: 'minimal', content: 'Modern Footer' }
+          footer: { style: 'minimal', content: 'Modern Footer', branding: false }
         }
       };
     `;
@@ -106,20 +129,28 @@ title: "Stress Test"
     fs.writeFileSync(path.join(tempDir, 'legacy.config.js'), legacyConfig);
     fs.writeFileSync(path.join(tempDir, 'modern.config.js'), modernConfig);
 
-    // 5. Build & Verify Both
-    console.log('🔨 [5/8] Executing Dual Engine Builds...');
+    // 5. Build & Verify
+    console.log('🔨 [5/8] Executing Engine Builds (Legacy, Modern V3, Zero-Config)...');
     runCmd(`node "${CLI_BIN}" build -c legacy.config.js`, tempDir);
     runCmd(`node "${CLI_BIN}" build -c modern.config.js`, tempDir);
+    runCmd(`node "${CLI_BIN}" build -z`, zeroConfigDir); // Zero config test
 
     console.log('🔍 [6/8] Verifying Static Outputs...');
     
     const modernHtml = fs.readFileSync(path.join(tempDir, 'site-modern/index.html'), 'utf8');
     const stressHtml = fs.readFileSync(path.join(tempDir, 'site-modern/stress/index.html'), 'utf8');
     const deepHtml = fs.readFileSync(path.join(tempDir, 'site-modern/level1/level2/level3/deep/index.html'), 'utf8');
+    
+    const v1Html = fs.readFileSync(path.join(tempDir, 'site-modern/v1/index.html'), 'utf8');
+    const notFoundHtml = fs.readFileSync(path.join(tempDir, 'site-modern/404.html'), 'utf8');
+    const redirectHtml = fs.readFileSync(path.join(tempDir, 'site-modern/old-guide/index.html'), 'utf8');
+    const zcHtml = fs.readFileSync(path.join(zeroConfigDir, 'site/index.html'), 'utf8');
+    const zcNestedHtml = fs.readFileSync(path.join(zeroConfigDir, 'site/nested/auto/index.html'), 'utf8');
 
     assert(modernHtml.includes('docmd-options-menu'), "Options Menu missing in Modern Config");
     assert(modernHtml.includes('sponsor.com'), "Sponsor Link missing");
     assert(modernHtml.includes('Modern Footer'), "Footer missing");
+    assert(!modernHtml.includes('Built with <svg'), "Branding toggle failed (branding is still visible)");
 
     assert(!stressHtml.includes(':::'), "PARSER LEAK DETECTED: Found raw ':::' in HTML output!");
     assert(stressHtml.includes('class="docmd-container card"'), "Card container failed to render");
@@ -127,6 +158,16 @@ title: "Stress Test"
     assert(stressHtml.includes('class="docmd-button"'), "Deep nested button failed to render");
 
     assert(deepHtml.includes('href="../../../../assets/css/docmd-main.css'), "CSS Relative Path calculation failed on deep folder!");
+
+    assert(modernHtml.includes('docmd-version-dropdown'), "Version dropdown missing in V2 (root)");
+    assert(v1Html.includes('V1 Home'), "V1 Content missing in subfolder");
+    assert(v1Html.includes('docmd-version-dropdown'), "Version dropdown missing in V1");
+    assert(notFoundHtml.includes('Custom 404'), "404 Title missing");
+    assert(notFoundHtml.includes('Page missing.'), "404 Content missing");
+    assert(redirectHtml.includes('http-equiv="refresh"'), "Redirect meta tag missing");
+    assert(redirectHtml.includes('/new-guide'), "Redirect URL missing");
+    assert(zcHtml.includes('Zero Config Home'), "Zero Config failed to build index");
+    assert(zcNestedHtml.includes('Auto Nested Page'), "Zero config failed to build nested auto-navigation page");
 
     // 7. Live Editor (COMPILE & RUNTIME TEST)
     console.log('🎥 [7/8] Testing "docmd live" build and RUNTIME Execution...');
