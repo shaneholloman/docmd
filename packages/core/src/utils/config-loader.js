@@ -16,22 +16,63 @@ const path = require('path');
 const fs = require('fs');
 const { validateConfig } = require('@docmd/parser'); 
 const { normalizeConfig } = require('./config-schema');
+const { buildAutoNav } = require('./auto-router');
 const chalk = require('chalk');
 
-async function loadConfig(configPath) {
+async function buildZeroConfig(cwd) {
+  console.log(chalk.cyan('✨ Zero-Config mode activated. Analyzing directory...'));
+  
+  // Detect if there's a 'docs' folder, otherwise use root
+  const srcDir = fs.existsSync(path.join(cwd, 'docs')) ? 'docs' : '.';
+  const absSrcDir = path.join(cwd, srcDir);
+
+  // Dynamically build the navigation tree
+  const autoNav = buildAutoNav(absSrcDir);
+
+  const autoConfig = {
+    title: path.basename(cwd) || 'Documentation',
+    srcDir: srcDir,
+    outputDir: 'site',
+    navigation: autoNav,
+    layout: { spa: true },
+    theme: { name: 'default', defaultMode: 'system' }
+  };
+
+  return normalizeConfig(autoConfig);
+}
+
+async function loadConfig(configPath, options = {}) {
   const cwd = process.cwd();
+
+  // 1. Intercept Zero-Config Mode
+  if (options.zeroConfig) {
+    return await buildZeroConfig(cwd);
+  }
+
   let absoluteConfigPath = path.resolve(cwd, configPath);
 
   if (!fs.existsSync(absoluteConfigPath) && configPath === 'docmd.config.js') {
     const legacyPath = path.resolve(cwd, 'config.js');
     if (fs.existsSync(legacyPath)) absoluteConfigPath = legacyPath;
-    else throw new Error(`Configuration file not found: ${absoluteConfigPath}`);
+    else {
+      // Fallback to Zero-Config if nothing is found to prevent crashing!
+      console.log(chalk.yellow('⚠️ No config file found. Falling back to Zero-Config mode...'));
+      return await buildZeroConfig(cwd);
+    }
   }
 
   try {
     delete require.cache[require.resolve(absoluteConfigPath)];
+
+    // Polyfill defineConfig globally so the config file works 
+    // even if @docmd/core isn't installed locally in the target project.
+    global.defineConfig = (config) => config;
+
     const rawConfig = require(absoluteConfigPath);
-    
+
+    // Clean up global to avoid pollution
+    delete global.defineConfig;
+
     // If user has 'search' or 'theme' at root, but no 'layout' object, they are legacy.
     const isLegacy = !rawConfig.layout && (
         rawConfig.search !== undefined || 
@@ -52,6 +93,12 @@ async function loadConfig(configPath) {
 
     validateConfig(rawConfig);
     const normalized = normalizeConfig(rawConfig);
+
+    // Ensure we have a navigation array, fallback to Auto-Router if empty
+    if (!normalized.navigation || normalized.navigation.length === 0) {
+      console.log(chalk.dim('   > No navigation found in config. Auto-generating...'));
+      normalized.navigation = buildAutoNav(path.resolve(cwd, normalized.srcDir));
+    }
 
     return normalized;
 

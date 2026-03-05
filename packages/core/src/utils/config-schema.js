@@ -21,10 +21,29 @@ const chalk = require('chalk');
 function normalizeConfig(userConfig) {
     const config = { ...userConfig };
 
-    // --- 1. Defaults & Root Settings ---
-    config.srcDir = config.srcDir || 'docs';
-    config.outputDir = config.outputDir || 'site';
+    // --- 1. Modern Syntax Standard (V3) ---
+    // New labels are the source of truth. Fallback to legacy labels if present.
+    config.title = config.title || config.siteTitle;
+    config.url = config.url || config.siteUrl || config.baseUrl;
+    config.src = config.src || config.srcDir || config.source || 'docs';
+    config.out = config.out || config.outDir || config.outputDir || 'site';
     config.base = config.base || '/';
+
+    // Failsafe: Keep legacy keys attached for older plugins (SEO, Sitemap) to prevent breakage during transition.
+    config.siteTitle = config.title;
+    config.siteUrl = config.url;
+    config.srcDir = config.src;
+    config.outputDir = config.out;
+
+    // --- Logo Normalization
+    if (typeof config.logo === 'string') {
+        config.logo = {
+            light: config.logo,
+            dark: config.logo,
+            alt: config.title || 'Logo',
+            href: '/'
+        };
+    }
 
     // --- 2. Layout Structure (V2 Schema) ---
     const userLayout = config.layout || {};
@@ -33,7 +52,7 @@ function normalizeConfig(userConfig) {
         spa: true,
         ...userLayout
     };
-    
+
     config.header = {
         enabled: true,
         ...(userLayout.header || config.header || {})
@@ -54,6 +73,7 @@ function normalizeConfig(userConfig) {
     config.footer = {
         style: 'minimal',
         content: typeof legacyFooter === 'string' ? legacyFooter : null,
+        branding: true,
         ...(userLayout.footer || (typeof legacyFooter === 'object' ? legacyFooter : {}))
     };
 
@@ -98,21 +118,39 @@ function normalizeConfig(userConfig) {
     config.theme = {
         name: 'default',
         defaultMode: 'system',
-        customCss: [],
+        customCss:[],
         ...(config.theme || {})
     };
 
-    config.customJs = config.customJs || [];
+    config.customJs = config.customJs ||[];
 
     // Normalize Navigation
-    config.navigation = Array.isArray(config.navigation) ? config.navigation : [];
-    if (config.navigation.length === 0) {
-        config.navigation.push({ title: 'Home', path: '/' });
-    }
+    config.navigation = Array.isArray(config.navigation) ? config.navigation :[];
 
     // --- 5. Plugins ---
-    // Ensure plugins object exists, populated by defaults + overrides
     config.plugins = config.plugins || {};
+
+    // --- 6. Versioning Engine ---
+    if (config.versions && Array.isArray(config.versions.all)) {
+        if (!config.versions.current) {
+            config.versions.current = config.versions.all[0]?.id || 'main';
+        }
+        config.versions.position = config.versions.position || 'sidebar-top';
+        config.versions.all = config.versions.all.map(v => ({
+            id: v.id,
+            dir: v.dir || `docs-${v.id}`,
+            label: v.label || v.id
+        }));
+    } else {
+        config.versions = false;
+    }
+
+    // --- 7. SEO Redirects & 404 ---
+    config.redirects = config.redirects || {};
+    config.notFound = config.notFound || {
+        title: '404 : Page Not Found',
+        content: 'The page you are looking for does not exist or has been moved.'
+    };
 
     return config;
 }

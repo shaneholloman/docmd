@@ -18,10 +18,10 @@ const readline = require('readline');
 const { version } = require('../../package.json');
 
 const defaultConfigContent = `// docmd.config.js
-module.exports = {
+module.exports = defineConfig({
   // --- Core Metadata ---
-  siteTitle: 'My Documentation',
-  siteUrl: '', // e.g. https://mysite.com (Critical for SEO/Sitemap)
+  title: 'My Documentation',
+  url: '', // e.g. https://mysite.com (Critical for SEO/Sitemap)
 
   // --- Branding ---
   logo: {
@@ -33,12 +33,12 @@ module.exports = {
   favicon: 'assets/favicon.ico',
 
   // --- Source & Output ---
-  srcDir: 'docs',
-  outputDir: 'site',
+  src: 'docs',
+  out: 'site',
 
-  // --- Layout & UI Architecture (V2) ---
+  // --- Layout & UI Architecture ---
   layout: {
-    spa: true, // Enable seamless page transitions (Single Page App behavior)
+    spa: true, // Enable seamless page transitions
     header: {
       enabled: true,
     },
@@ -46,20 +46,18 @@ module.exports = {
       collapsible: true,
       defaultCollapsed: false,
     },
-    // Centralized Options Menu (Search, Theme, Sponsor)
     optionsMenu: {
       position: 'sidebar-top', // 'header', 'sidebar-top', 'sidebar-bottom'
       components: {
-        search: true,      // Enable built-in offline search
-        themeSwitch: true, // Enable light/dark toggle
-        sponsor: null,     // e.g. 'https://github.com/sponsors/myname'
+        search: true,      
+        themeSwitch: true, 
+        sponsor: null,     
       }
     },
-    // Footer Configuration
     footer: {
-      style: 'minimal',    // 'minimal' or 'complete'
-      content: '© ' + new Date().getFullYear() + ' My Project. Built with [docmd](https://docmd.io).',
-      // For 'complete' style, you can add 'columns': [...] here.
+      style: 'minimal', // 'minimal' or 'complete'
+      content: '© ' + new Date().getFullYear() + ' My Project.',
+      branding: true    // Config for "Built with docmd" badge
     }
   },
 
@@ -67,30 +65,49 @@ module.exports = {
   theme: {
     name: 'default',        // Options: 'default', 'sky', 'ruby', 'retro'
     defaultMode: 'system',  // 'light', 'dark', or 'system'
-    codeHighlight: true,    // Enable Highlight.js
-    customCss: [],          // e.g. ['assets/css/custom.css']
+    codeHighlight: true,    
+    customCss: [],          
   },
 
   // --- General Features ---
-  minify: true,           // Minify HTML/CSS/JS in build
-  autoTitleFromH1: true,  // Auto-generate page title from first H1
-  copyCode: true,         // Show "copy" button on code blocks
-  pageNavigation: true,   // Prev/Next buttons at bottom
+  minify: true,           
+  autoTitleFromH1: true,  
+  copyCode: true,         
+  pageNavigation: true,   
   
-  customJs: [],           // e.g. ['assets/js/custom.js']
+  customJs: [],           
+
+  // --- Versioning (Optional) ---
+  /*
+  versions: {
+    position: 'sidebar-top', // 'sidebar-top', 'sidebar-bottom'
+    current: 'v2',
+    all: [
+      { id: 'v2',       // Unique identifier for this version (used in URLs) and matching current version
+       dir: 'docs',     // Source directory for latest version
+       label: 'v2.0 (Latest)'
+      },
+      { id: 'v1',
+       dir: 'docs-v1',  // Source directory for older version
+       label: 'v1.0'
+      }
+    ]
+  },
+  */
 
   // --- Navigation (Sidebar) ---
   navigation: [
     { title: 'Introduction', path: '/', icon: 'home' },
     {
-      title: 'Guide',
-      icon: 'book-open',
+      title: 'Getting Started',
+      icon: 'rocket',
       collapsible: false,
       children: [
-        { title: 'Getting Started', path: 'https://docs.docmd.io/getting-started/installation', icon: 'rocket', external: true },
-        { title: 'Configuration', path: 'https://docs.docmd.io/configuration', icon: 'settings', external: true },
+        { title: 'Installation', path: 'https://docs.docmd.io/getting-started/installation', icon: 'download', external: true },
+        { title: 'Configuration', path: 'https://docs.docmd.io/configuration/general/', icon: 'cog', external: true },
       ],
     },
+    { title: 'Live Editor', path: 'https://live.docmd.io', icon: 'play', external: true },
     { title: 'GitHub', path: 'https://github.com/docmd-io/docmd', icon: 'github', external: true },
   ],
 
@@ -98,19 +115,12 @@ module.exports = {
   plugins: {
     seo: {
       defaultDescription: 'Documentation built with docmd.',
-      openGraph: {
-        defaultImage: '',   // e.g. 'assets/images/og-image.png'
-      },
-      twitter: {
-        cardType: 'summary_large_image',
-      }
+      openGraph: { defaultImage: '' },
+      twitter: { cardType: 'summary_large_image' }
     },
-    sitemap: {
-      defaultChangefreq: 'weekly',
-      defaultPriority: 0.8
-    },
-    analytics: {
-      googleV4: { measurementId: 'G-X9WTDL262N' } // Replace with your GA Measurement ID
+    sitemap: { defaultChangefreq: 'weekly' },
+    analytics: { 
+      googleV4: { measurementId: 'G-X9WTDL262N' } // Example Google Analytics ID, replace with your own
     },
     search: {},
     mermaid: {},
@@ -123,7 +133,7 @@ module.exports = {
     baseUrl: 'https://github.com/USERNAME/REPO/edit/main/docs',
     text: 'Edit this page'
   }
-};
+});
 `;
 
 const defaultIndexMdContent = `---

@@ -131,8 +131,38 @@ async function serveStatic(req, res, rootDir) {
   } catch (err) {
     if (err.code === 'ENOENT') {
       // console.log(chalk.yellow(`⚠️  404 Not Found: ${req.url}`)); // Optional: Keep log quiet for 404s to avoid noise
-      res.writeHead(404, { 'Content-Type': 'text/html' });
-      res.end('<h1>404 Not Found</h1><p>docmd dev server</p>');
+      // 1. Try to serve the generated custom 404 page
+      const custom404Path = path.join(rootDir, '404.html');
+      try {
+        const content = await fs.readFile(custom404Path);
+        res.writeHead(404, { 'Content-Type': 'text/html' });
+        
+        // Inject Live Reload into 404 page too so development continues smoothly
+        const htmlStr = content.toString('utf-8');
+        const liveReloadScript = `
+        <script>
+          (function() {
+            let socket;
+            function connect() {
+              socket = new WebSocket('ws://' + window.location.host);
+              socket.onmessage = (e) => { if(e.data === 'reload') window.location.reload(); };
+              socket.onclose = () => setTimeout(connect, 1000);
+            }
+            setTimeout(connect, 500);
+          })();
+        </script></body>`;
+        res.end(htmlStr.replace('</body>', liveReloadScript));
+      } catch (e2) {
+        // 2. Fallback if 404.html doesn't exist (e.g. build failed)
+        res.writeHead(404, { 'Content-Type': 'text/html' });
+        res.end(`
+          <div style="font-family:system-ui;text-align:center;padding:50px;">
+            <h1>404 Not Found</h1>
+            <p>The requested URL <code>${req.url}</code> was not found.</p>
+            <p style="color:#666;font-size:0.9em;">(docmd dev server)</p>
+          </div>
+        `);
+      }
     } else {
       res.writeHead(500);
       res.end(`Server Error: ${err.code}`);
@@ -141,9 +171,15 @@ async function serveStatic(req, res, rootDir) {
 }
 
 // Main Dev Function
+async function startDevServer(configPathOption, opts = {}) {
+  // Bulletproof defaults
+  const options = {
+    preserve: opts.preserve || false,
+    port: opts.port || undefined,
+    zeroConfig: opts.zeroConfig || false
+  };
 
-async function startDevServer(configPathOption, options = { preserve: false, port: undefined }) {
-  let config = await loadConfig(configPathOption);
+  let config = await loadConfig(configPathOption, { zeroConfig: options.zeroConfig });
   const CWD = process.cwd();
 
   // Config Fallback Logic
@@ -154,8 +190,8 @@ async function startDevServer(configPathOption, options = { preserve: false, por
   }
 
   const resolveConfigPaths = (currentConfig) => ({
-    outputDir: path.resolve(CWD, currentConfig.outputDir),
-    srcDirToWatch: path.resolve(CWD, currentConfig.srcDir),
+    outputDir: path.resolve(CWD, currentConfig.out),
+    srcDirToWatch: path.resolve(CWD, currentConfig.src),
     configFileToWatch: actualConfigPath,
     userAssetsDir: path.resolve(CWD, 'assets'),
   });
@@ -177,14 +213,17 @@ async function startDevServer(configPathOption, options = { preserve: false, por
   // Initial Build
   console.log(chalk.blue('🚀 Performing initial build...'));
   try {
-    await buildSite(configPathOption, { isDev: true, preserve: options.preserve });
+    await buildSite(configPathOption, { isDev: true, preserve: options.preserve, zeroConfig: options.zeroConfig });
   } catch (error) {
       console.error(chalk.red('❌ Initial build failed:'), error.message);
   }
 
   // Watcher Setup
   const userAssetsDirExists = await fs.pathExists(paths.userAssetsDir);
-  const watchedPaths = [paths.srcDirToWatch, paths.configFileToWatch];
+  const watchedPaths = [paths.srcDirToWatch];
+  if (!options.zeroConfig) {
+    watchedPaths.push(paths.configFileToWatch);
+  }
   if (userAssetsDirExists) watchedPaths.push(paths.userAssetsDir);
   
   // Internal development watch logic
@@ -200,7 +239,9 @@ async function startDevServer(configPathOption, options = { preserve: false, por
   
   console.log(chalk.dim('\n👀 Watching for changes in:'));
   console.log(chalk.dim(`   - Source: ${chalk.cyan(formatPathForDisplay(paths.srcDirToWatch, CWD))}`));
-  console.log(chalk.dim(`   - Config: ${chalk.cyan(formatPathForDisplay(paths.configFileToWatch, CWD))}`));
+  if (!options.zeroConfig) {
+    console.log(chalk.dim(`   - Config: ${chalk.cyan(formatPathForDisplay(paths.configFileToWatch, CWD))}`));
+  }
   if (userAssetsDirExists) {
     console.log(chalk.dim(`   - Assets: ${chalk.cyan(formatPathForDisplay(paths.userAssetsDir, CWD))}`));
   }
@@ -219,11 +260,11 @@ async function startDevServer(configPathOption, options = { preserve: false, por
     
     try {
       if (filePath === paths.configFileToWatch) {
-        config = await loadConfig(configPathOption);
+        config = await loadConfig(configPathOption, { zeroConfig: options.zeroConfig });
         paths = resolveConfigPaths(config);
       }
 
-      await buildSite(configPathOption, { isDev: true, preserve: options.preserve });
+      await buildSite(configPathOption, { isDev: true, preserve: options.preserve, zeroConfig: options.zeroConfig });
       broadcastReload();
       process.stdout.write(chalk.green('Done.\n'));
       

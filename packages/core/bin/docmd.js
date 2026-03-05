@@ -44,10 +44,11 @@ program
   .command('build')
   .description('Build the static site for production')
   .option('-c, --config <path>', 'Path to config', 'docmd.config.js')
+  .option('-z, --zero-config', 'Run in auto-detect mode without a config file')
   .option('--offline', 'Optimize for file:// viewing')
   .action((opts) => {
     printBanner(); 
-    buildSite(opts.config, { isDev: false, offline: opts.offline });
+    buildSite(opts.config, { isDev: false, offline: opts.offline, zeroConfig: opts.zeroConfig });
   });
 
 program
@@ -55,6 +56,7 @@ program
   .description('Start the development server')
   .option('-c, --config <path>', 'Path to config', 'docmd.config.js')
   .option('-p, --port <number>', 'Port to run server')
+  .option('-z, --zero-config', 'Run in auto-detect mode without a config file')
   .action((opts) => {
     printBanner();
     startDevServer(opts.config, opts);
