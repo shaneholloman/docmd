@@ -1,7 +1,7 @@
 {
   "name": "@docmd/ui",
-  "version": "0.5.0",
-  "description": "Base UI templates and assets for docmd",
+  "version": "0.5.1",
+  "description": "Base UI templates and assets for docmd.",
   "main": "index.js",
   "files": [
     "templates",

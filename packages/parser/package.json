@@ -1,7 +1,7 @@
 {
   "name": "@docmd/parser",
-  "version": "0.5.0",
-  "description": "Pure Markdown parsing engine for docmd",
+  "version": "0.5.1",
+  "description": "Pure Markdown parsing engine for docmd.",
   "main": "src/index.js",
   "dependencies": {
     "ejs": "^3.1.10",
