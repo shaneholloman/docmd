@@ -3,7 +3,6 @@
   <!-- PROJECT TITLE -->
   <h3>
     <img src="https://github.com/docmd-io/docmd/blob/main/packages/ui/assets/images/docmd-logo-dark.png?raw=true" alt="docmd logo" width="210" />
-    <!-- docmd -->
   </h3>
   
   <!-- ONE LINE SUMMARY -->
@@ -43,75 +42,70 @@
 ## Features
 
 - **Zero Config**: Intelligent auto-routing scans your folders and builds navigation trees instantly.
-- **Versioning**: Enterprise-grade versioning (v1, v2) with sticky context switching.
-- **Super Fast**: Generates pure static HTML. No hydration gap. No heavy frameworks.
-- **AI-Ready**: Automatically generates `llms.txt` context for AI agents.
-- **Smart Search**: Built-in, privacy-friendly full-text search with deep-linking.
-- **Isomorphic**: Runs seamlessly in Node.js (CLI) or directly in the browser.
-- **Rich Content**: Native support for Tabs, Steps, Callouts, and Mermaid diagrams.
-- **SEO Optimized**: Native sitemaps, canonical tags, and static HTML redirects.
+- **Versioning**: Enterprise-grade versioning (v1, v2) with sticky context switching and smart routing.
+- **Super Fast**: Generates pure static HTML. No hydration gap. No heavy React/Vue overhead.
+- **AI-Ready**: Automatically generates `llms.txt` and `llms-full.txt` context for AI agents.
+- **PWA**: Native Progressive Web App support for offline access and smart background caching.
+- **Smart Search**: Built-in, privacy-friendly offline search with deep-linking to exact headers.
+- **Isomorphic**: Runs seamlessly in Node.js (CLI) or directly in the browser via Live Editor.
+- **Rich Content**: Native Markdown support for Tabs, Steps, Callouts, and Mermaid diagrams.
+- **SEO Optimized**: Auto-generates sitemaps, canonical tags, 404 pages, and static HTML redirects.
 
-## Installation
+## Getting Started
+
+You can run `docmd` on-the-fly without installing, or add it permanently to your long term projects.
+
+### Option 1: Zero-Config (Try it instantly)
+Run `docmd` inside any folder containing markdown files. It will automatically extract your headers and build a nested navigation sidebar.
+```bash
+# Start local dev server
+npx @docmd/core dev -z
+
+# Generate production static site
+npx @docmd/core build -z
+```
+> **Note:** Zero-Config (`-z`) is currently in `beta`. It is fantastic for quick previews, but for production sites, we recommend initializing a standard configuration file for maximum control.
+
+### Option 2: Project Installation (Recommended)
+For permanent projects, install `docmd` as dependency to lock your versions.
+
+```bash
+# 1. Install locally
+npm install @docmd/core
+
+# 2. Initialize your configuration
+npx docmd init
+
+# 3. Start developing
+npx docmd dev
+```
+
+### Option 3: Global Installation
+Install once and use the `docmd` command anywhere on your machine.
 
 ```bash
 npm install -g @docmd/core
+
+docmd dev        # Start the local dev server
+docmd build      # Generate the production static site
 ```
-
-## Usage
-
-### CLI
-
-The Command Line Interface is the primary way to interact with `docmd`.
-
-```bash
-docmd init      # Initialize a new project with V3 config
-docmd dev -z    # ⚡️ Start Zero-Config mode (no setup required)
-docmd dev       # Start local server with config
-docmd build     # Generate production static site
-docmd live      # Launch the browser-based Live Editor
-docmd migrate   # Upgrade legacy configs to V3 structure
-```
-
-### API
-
-`docmd` exports its core engine, allowing you to build documentation programmatically within your own Node.js scripts or build tools.
-
-```javascript
-const { build, buildLive } = require('@docmd/core');
-
-// Trigger a standard documentation build
-await build('./docmd.config.js', { 
-  isDev: false, 
-  preserve: true 
-});
-
-// Trigger a Live Editor bundle build
-await buildLive(); 
-```
-
-### Live Editor
-
-`docmd` features a modular architecture that allows the core engine to run client-side. 
-
-Running `docmd live` builds a standalone web application where you can write Markdown and see the preview instantly without any server-side processing. You can embed the generated `docmd-live.js` bundle to add Markdown capabilities to your own applications.
 
 ## Project Structure
 
-`docmd` keeps it simple. Your content lives in `docs/`, your config in `docmd.config.js`.
+`docmd` keeps your repository clean. Your content lives in `docs/`, your config in `docmd.config.js`.
 
 ```bash
 my-docs/
-├── docs/                  # Your Markdown files
+├── docs/                  # Your Markdown Files
 │   ├── index.md           # Homepage
-│   └── guide.md           # Content page
-├── assets/                # Images and custom CSS
-├── docmd.config.js        # Configuration
-└── package.json
+│   └── guide.md           # Content Page
+├── assets/                # Images and Custom JS/CSS
+├── docmd.config.js        # The docmd Configuration
+└── package.json           # Node.js Dependencies
 ```
 
 ## Configuration
-
-Customize your site in seconds via `docmd.config.js`. We use a type-safe helper for better DX:
+`docmd` provides a highly flexible API. Customize your site in seconds via `docmd.config.js`. Here is a robust example showing off our most powerful features:
 
 ```javascript
 const { defineConfig } = require('@docmd/core');
@@ -124,46 +118,85 @@ module.exports = defineConfig({
   
   // Enterprise Versioning
   versions: {
-    current: 'v2',
-    all: [
-      { id: 'v2', dir: 'docs', label: 'v2.x' },
+    current: 'v2', // Builds to root (/) for optimal SEO
+    all:[
+      { id: 'v2', dir: 'docs', label: 'v2.x (Latest)' },
       { id: 'v1', dir: 'docs-v1', label: 'v1.x' }
     ]
   },
 
-  // Layout Architecture
+  // Layout & UI Architecture
   layout: {
-    spa: true, // Seamless page transitions
+    spa: true,  // Enable buttery-smooth page transitions
     header: { enabled: true },
     sidebar: { collapsible: true },
     
-    // Unified Options Menu
     optionsMenu: {
       position: 'header',
       components: {
         search: true,
-        themeSwitch: true,
-        sponsor: 'https://github.com/sponsors/me'
+        themeSwitch: true
       }
     },
 
     footer: {
-      style: 'minimal',
-      branding: false // Whitelabeling
+      style: 'minimal'
     }
   },
   
+  // Custom Navigation (If not using Zero-Config)
+  navigation:[
+    { title: 'Home', path: '/', icon: 'home' },
+    {
+      title: 'Guide',
+      icon: 'book-open',
+      children:[
+        { title: 'Installation', path: '/installation' },
+        { title: 'API Reference', path: '/api' },
+      ],
+    }
+  ],
+
   // Theme Settings
   theme: {
-    name: 'sky',
-    defaultMode: 'system'
+    name: 'sky',            // 'default', 'sky', 'ruby', 'retro'
+    defaultMode: 'system',  // 'light', 'dark', 'system'
   },
 
-  // SEO & Redirects
-  redirects: { '/old-guide': '/new-guide' },
+  // Powerful Plugins (Zero setup required)
+  plugins: {
+    search: {},
+    pwa: { themeColor: '#0097ff' },  // Makes your docs installable!
+    llms: { fullContext: true },     // Generates llms-full.txt
+    mermaid: {}
+  },
+
+  // SEO & Error Handling
+  redirects: { '/old-guide': '/installation' },
   notFound: { title: 'Page Not Found', content: 'This page has moved.' }
 });
 ```
+
+## Advanced Usage
+
+### Programmatic API
+`docmd` exports its core engine, allowing you to build documentation programmatically within your own Node.js scripts or CI/CD pipelines.
+
+```javascript
+const { build, buildLive } = require('@docmd/core');
+
+// Trigger a standard documentation build
+await build('./docmd.config.js', { 
+  isDev: false, 
+  offline: false 
+});
+
+// Build the Live Editor standalone bundle
+await buildLive(); 
+```
+
+### Live Editor (`docmd live`)
+`docmd` features an isomorphic architecture. Running `npx @docmd/core live` builds a standalone web application where you can write Markdown and see the preview instantly without any server-side processing. You can also try our **[docmd live](https://live.docmd.io)** editor!
 
 ## Comparison
 
@@ -174,19 +207,18 @@ module.exports = defineConfig({
 | **Output** | **Static HTML** | React Hydration | Static HTML | Hosted |
 | **JS Payload** | **Tiny (< 20kb)** | Heavy (> 200kb) | Minimal | Medium |
 | **Versioning** | **Easy (Config + Auto)** | Complex (FS) | Plugin (Mike) | Native |
+| **i18n Support** | **In Pipeline** | Native | Theme-based | Beta |
 | **Search** | **Built-in (Offline)** | Algolia (Cloud) | Built-in (Lunr) | Built-in (Cloud) |
-| **Setup** | **Instant (-z)** | ~15 mins | ~10 mins | Instant |
+| **PWA** | **Built-in (Plugin)** | Plugin | None | Hosted |
+| **AI Context** | **Built-in (llms.txt)** | Plugin | None | Proprietary |
+| **Setup** | **Instant (-z)** | ~15 mins | ~10 mins | ~5 mins |
 | **Cost** | **Free OSS** | Free OSS | Free OSS | Freemium |
 
 ## Community & Support
-
 - **Contributing**: We welcome PRs! See [CONTRIBUTING.md](.github/CONTRIBUTING.md).
 - **Support**: If you find `docmd` useful, please consider [sponsoring the project](https://github.com/sponsors/mgks) or giving it a star ⭐.
 
 ## License
-
 Distributed under the MIT License. See `LICENSE` for more information.
 
-> **{ github.com/mgks }**
-> 
-> ![Website Badge](https://img.shields.io/badge/Visit-mgks.dev-blue?style=flat&link=https%3A%2F%2Fmgks.dev) ![Sponsor Badge](https://img.shields.io/badge/%20%20Become%20a%20Sponsor%20%20-red?style=flat&logo=github&link=https%3A%2F%2Fgithub.com%2Fsponsors%2Fmgks)
+![Website Badge](https://img.shields.io/badge/.*%20mgks.dev-blue?style=flat&link=https%3A%2F%2Fmgks.dev) ![Sponsor Badge](https://img.shields.io/badge/%20%20Become%20a%20Sponsor%20%20-red?style=flat&logo=github&link=https%3A%2F%2Fgithub.com%2Fsponsors%2Fmgks)
