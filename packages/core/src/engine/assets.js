@@ -29,6 +29,9 @@ async function findFilesRecursive(dir, extensions) {
   if (!await fs.exists(dir)) return [];
   const items = await fs.readdir(dir, { withFileTypes: true });
   for (const item of items) {
+    // Explicitly ignore system files, git, and node_modules to prevent duplicate ID crashes
+    if (item.name === 'node_modules' || item.name.startsWith('.') || item.name === 'site') continue;
+
     const fullPath = path.join(dir, item.name);
     if (item.isDirectory()) {
       files = files.concat(await findFilesRecursive(fullPath, extensions));
@@ -43,7 +46,7 @@ async function findFilesRecursive(dir, extensions) {
 
 async function prepareAssets(config, outputDir, options = {}) {
   const CWD = process.cwd();
-  
+
   // 1. Core UI Assets
   const uiAssets = ui.getAssetsDir();
   if (await fs.exists(uiAssets)) await fs.copy(uiAssets, path.join(outputDir, 'assets'));
@@ -83,14 +86,14 @@ async function minifyDir(dir) {
 
 // Generate HTML Tag Helper
 function generateAssetTag(pathOrUrl, type, attributes = {}) {
-  const attrs = Object.entries(attributes).map(([k,v]) => v === true ? k : `${k}="${v}"`).join(' ');
+  const attrs = Object.entries(attributes).map(([k, v]) => v === true ? k : `${k}="${v}"`).join(' ');
   if (type === 'css') return `<link rel="stylesheet" href="${pathOrUrl}" ${attrs}>`;
   if (type === 'js') return `<script src="${pathOrUrl}" ${attrs}></script>`;
   return '';
 }
 
-module.exports = { 
-  findFilesRecursive, 
-  prepareAssets, 
-  generateAssetTag 
+module.exports = {
+  findFilesRecursive,
+  prepareAssets,
+  generateAssetTag
 };

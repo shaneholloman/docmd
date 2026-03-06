@@ -67,7 +67,7 @@ function getNetworkIp() {
 async function serveStatic(req, res, rootDir) {
   let safePath = path.normalize(req.url).replace(/^(\.\.[\/\\])+/, '').split('?')[0].split('#')[0];
   if (safePath === '/' || safePath === '\\') safePath = 'index.html';
-  
+
   let filePath = path.join(rootDir, safePath);
 
   try {
@@ -82,14 +82,14 @@ async function serveStatic(req, res, rootDir) {
         throw e;
       }
     }
-    
+
     if (stats.isDirectory()) {
       if (!req.url.split('?')[0].endsWith('/')) {
         res.writeHead(301, { 'Location': req.url + '/' });
         res.end();
         return;
       }
-      
+
       filePath = path.join(filePath, 'index.html');
       await fs.stat(filePath);
     }
@@ -99,7 +99,7 @@ async function serveStatic(req, res, rootDir) {
     const content = await fs.readFile(filePath);
 
     res.writeHead(200, { 'Content-Type': contentType });
-    
+
     if (contentType === 'text/html') {
       const htmlStr = content.toString('utf-8');
       const liveReloadScript = `
@@ -136,7 +136,7 @@ async function serveStatic(req, res, rootDir) {
       try {
         const content = await fs.readFile(custom404Path);
         res.writeHead(404, { 'Content-Type': 'text/html' });
-        
+
         // Inject Live Reload into 404 page too so development continues smoothly
         const htmlStr = content.toString('utf-8');
         const liveReloadScript = `
@@ -185,8 +185,8 @@ async function startDevServer(configPathOption, opts = {}) {
   // Config Fallback Logic
   let actualConfigPath = path.resolve(CWD, configPathOption);
   if (configPathOption === 'docmd.config.js' && !await fs.pathExists(actualConfigPath)) {
-      const legacyPath = path.resolve(CWD, 'config.js');
-      if (await fs.pathExists(legacyPath)) actualConfigPath = legacyPath;
+    const legacyPath = path.resolve(CWD, 'config.js');
+    if (await fs.pathExists(legacyPath)) actualConfigPath = legacyPath;
   }
 
   const resolveConfigPaths = (currentConfig) => ({
@@ -197,10 +197,10 @@ async function startDevServer(configPathOption, opts = {}) {
   });
 
   let paths = resolveConfigPaths(config);
-  
+
   // Create Server
   const server = http.createServer((req, res) => serveStatic(req, res, paths.outputDir));
-  let wss; 
+  let wss;
 
   function broadcastReload() {
     if (wss) {
@@ -215,17 +215,17 @@ async function startDevServer(configPathOption, opts = {}) {
   try {
     await buildSite(configPathOption, { isDev: true, preserve: options.preserve, zeroConfig: options.zeroConfig });
   } catch (error) {
-      console.error(chalk.red('❌ Initial build failed:'), error.message);
+    console.error(chalk.red('❌ Initial build failed:'), error.message);
   }
 
   // Watcher Setup
   const userAssetsDirExists = await fs.pathExists(paths.userAssetsDir);
   const watchedPaths = [paths.srcDirToWatch];
-  if (!options.zeroConfig) {
+  if (!options.zeroConfig && await fs.pathExists(paths.configFileToWatch)) {
     watchedPaths.push(paths.configFileToWatch);
   }
   if (userAssetsDirExists) watchedPaths.push(paths.userAssetsDir);
-  
+
   // Internal development watch logic
   if (process.env.DOCMD_DEV === 'true') {
     const DOCMD_ROOT = path.resolve(__dirname, '..');
@@ -236,41 +236,74 @@ async function startDevServer(configPathOption, opts = {}) {
       path.join(DOCMD_ROOT, 'plugins')
     );
   }
-  
+
   console.log(chalk.dim('\n👀 Watching for changes in:'));
   console.log(chalk.dim(`   - Source: ${chalk.cyan(formatPathForDisplay(paths.srcDirToWatch, CWD))}`));
-  if (!options.zeroConfig) {
+  if (!options.zeroConfig && await fs.pathExists(paths.configFileToWatch)) {
     console.log(chalk.dim(`   - Config: ${chalk.cyan(formatPathForDisplay(paths.configFileToWatch, CWD))}`));
   }
   if (userAssetsDirExists) {
     console.log(chalk.dim(`   - Assets: ${chalk.cyan(formatPathForDisplay(paths.userAssetsDir, CWD))}`));
   }
-  console.log(''); 
+  console.log('');
 
   const watcher = chokidar.watch(watchedPaths, {
-    ignored: /(^|[\/\\])\../,
+    ignored: [/(^|[\/\\])\../, '**/.git/**', '**/node_modules/**', paths.outputDir],
     persistent: true,
     ignoreInitial: true,
     awaitWriteFinish: { stabilityThreshold: 100, pollInterval: 100 }
   });
 
-  watcher.on('all', async (event, filePath) => {
-    const relativeFilePath = path.relative(CWD, filePath);
-    process.stdout.write(chalk.dim(`↻ Change in ${relativeFilePath}... `));
-    
-    try {
-      if (filePath === paths.configFileToWatch) {
-        config = await loadConfig(configPathOption, { zeroConfig: options.zeroConfig });
-        paths = resolveConfigPaths(config);
-      }
+  let isRebuilding = false;
+  let rebuildQueued = false;
+  let configNeedsReload = false;
+  let rebuildTimeout = null;
 
-      await buildSite(configPathOption, { isDev: true, preserve: options.preserve, zeroConfig: options.zeroConfig });
-      broadcastReload();
-      process.stdout.write(chalk.green('Done.\n'));
-      
-    } catch (error) {
-      console.error(chalk.red('\n❌ Rebuild failed:'), error.message);
+  watcher.on('all', (event, filePath) => {
+    const relativeFilePath = path.relative(CWD, filePath);
+
+    // Ignore common system file noise from flooding terminals
+    if (relativeFilePath.includes('.DS_Store')) return;
+
+    process.stdout.write(chalk.dim(`↻ Change in ${relativeFilePath}... `));
+
+    if (filePath === paths.configFileToWatch) {
+      configNeedsReload = true;
     }
+
+    if (rebuildTimeout) clearTimeout(rebuildTimeout);
+
+    rebuildTimeout = setTimeout(() => {
+      const executeBuildFn = async () => {
+        if (isRebuilding) {
+          rebuildQueued = true;
+          return;
+        }
+        isRebuilding = true;
+        rebuildQueued = false;
+
+        try {
+          if (configNeedsReload) {
+            configNeedsReload = false;
+            config = await loadConfig(configPathOption, { zeroConfig: options.zeroConfig });
+            paths = resolveConfigPaths(config);
+          }
+
+          await buildSite(configPathOption, { isDev: true, preserve: options.preserve, zeroConfig: options.zeroConfig });
+          broadcastReload();
+          process.stdout.write(chalk.green('Done.\n'));
+
+        } catch (error) {
+          console.error(chalk.red('\n❌ Rebuild failed:'), error.message);
+        } finally {
+          isRebuilding = false;
+          if (rebuildQueued) {
+            executeBuildFn();
+          }
+        }
+      };
+      executeBuildFn();
+    }, 150);
   });
 
   // Server Startup Logic
@@ -295,7 +328,7 @@ async function startDevServer(configPathOption, opts = {}) {
       });
     });
   }
-  
+
   function tryStartServer(port) {
     server.listen(port, '0.0.0.0')
       .on('listening', async () => {
@@ -313,7 +346,7 @@ async function startDevServer(configPathOption, opts = {}) {
         console.log('');
         console.log(`  ${chalk.bold('Local:')}    ${chalk.cyan(localUrl)}`);
         if (networkUrl) {
-            console.log(`  ${chalk.bold('Network:')}  ${chalk.cyan(networkUrl)}`);
+          console.log(`  ${chalk.bold('Network:')}  ${chalk.cyan(networkUrl)}`);
         }
         console.log('');
         console.log(`  ${chalk.dim('Serving:')}  ${formatPathForDisplay(paths.outputDir, CWD)}`);
@@ -321,16 +354,16 @@ async function startDevServer(configPathOption, opts = {}) {
         console.log('');
 
         if (!await fs.pathExists(indexHtmlPath)) {
-            console.warn(chalk.yellow(`⚠️  Warning: Root index.html not found.`));
+          console.warn(chalk.yellow(`⚠️  Warning: Root index.html not found.`));
         }
       })
       .on('error', (err) => {
         if (err.code === 'EADDRINUSE') {
-           server.close(); 
-           tryStartServer(port + 1);
+          server.close();
+          tryStartServer(port + 1);
         } else {
-           console.error(chalk.red(`Failed to start server: ${err.message}`));
-           process.exit(1);
+          console.error(chalk.red(`Failed to start server: ${err.message}`));
+          process.exit(1);
         }
       });
   }

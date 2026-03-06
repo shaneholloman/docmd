@@ -23,8 +23,18 @@ async function remove(dirPath) {
   await fs.rm(dirPath, { recursive: true, force: true });
 }
 
-async function copy(src, dest) {
-  await fs.cp(src, dest, { recursive: true });
+async function copy(src, dest, retryCount = 0) {
+  try {
+    await fs.cp(src, dest, { recursive: true });
+  } catch (err) {
+    if (err.code === 'ENOENT' && retryCount < 2) {
+      // macOS Node.js recursive copy race condition over external IDE operations:
+      // Sleep for 50ms and retry to securely shield the user from 'ghost unlinks'.
+      await new Promise(r => setTimeout(r, 50));
+      return copy(src, dest, retryCount + 1);
+    }
+    throw err;
+  }
 }
 
 async function exists(filePath) {

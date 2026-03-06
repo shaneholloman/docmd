@@ -30,7 +30,8 @@ const ALIASES = {
   'sitemap': '@docmd/plugin-sitemap',
   'analytics': '@docmd/plugin-analytics',
   'mermaid': '@docmd/plugin-mermaid',
-  'llms': '@docmd/plugin-llms'
+  'llms': '@docmd/plugin-llms',
+  'pwa': '@docmd/plugin-pwa'
 };
 
 function loadPlugins(config) {
@@ -47,6 +48,7 @@ function loadPlugins(config) {
   pluginMap.set('@docmd/plugin-seo', config.plugins?.seo || {});
   pluginMap.set('@docmd/plugin-sitemap', config.plugins?.sitemap || {});
   pluginMap.set('@docmd/plugin-analytics', config.plugins?.analytics || {});
+  pluginMap.set('@docmd/plugin-pwa', config.plugins?.pwa || {});
 
   // B. Add/Override from Config
   if (config.plugins) {
@@ -54,7 +56,7 @@ function loadPlugins(config) {
       // Resolve Alias (e.g., 'mermaid' -> '@docmd/plugin-mermaid')
       const resolvedName = ALIASES[key] || key;
       const options = config.plugins[key];
-      
+
       // Update map (Override default if exists)
       pluginMap.set(resolvedName, options);
     });
@@ -88,18 +90,18 @@ function loadPlugins(config) {
 
 function registerPlugin(name, plugin, options) {
   if (typeof plugin.markdownSetup === 'function') hooks.markdownSetup.push((md) => plugin.markdownSetup(md, options));
-  
+
   if (typeof plugin.generateMetaTags === 'function') {
     hooks.injectHead.push((config, page, root) => plugin.generateMetaTags(config, page, root));
   }
-  
+
   if (typeof plugin.generateScripts === 'function') {
     hooks.injectHead.push((c) => plugin.generateScripts(c, options).headScriptsHtml || '');
     hooks.injectBody.push((c) => plugin.generateScripts(c, options).bodyScriptsHtml || '');
   }
 
   if (typeof plugin.onPostBuild === 'function') hooks.onPostBuild.push((ctx) => plugin.onPostBuild({ ...ctx, options }));
-  
+
   if (typeof plugin.getAssets === 'function') hooks.assets.push(() => plugin.getAssets(options));
 }
 
