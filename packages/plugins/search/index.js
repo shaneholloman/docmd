@@ -20,8 +20,8 @@ async function onPostBuild({ config, pages, outputDir, log }) {
   // Check if disabled in new config schema or old config schema
   const isEnabled = config.optionsMenu ? config.optionsMenu.components.search !== false : config.search !== false;
   if (!isEnabled) return;
-  
-  if(log) log('🔍 Generating search index...');
+
+  if (log) log('🔍 Generating search index...');
 
   const searchData = [];
   pages.forEach(page => {
@@ -29,13 +29,29 @@ async function onPostBuild({ config, pages, outputDir, log }) {
       let pageId = page.outputPath.replace(/\\/g, '/');
       if (pageId.endsWith('/index.html')) pageId = pageId.slice(0, -10);
       if (pageId.endsWith('.html')) pageId = pageId.slice(0, -5);
-      
+
+      // 1. Add the main page record
       searchData.push({
         id: pageId,
         title: page.searchData.title,
         text: page.searchData.content,
-        headings: (page.searchData.headings || []).join(' ')
+        // We can keep page-level headings as a string block for general page matching
+        headings: (page.searchData.headings || []).map(h => h.text).join(' ')
       });
+
+      // 2. Add individual heading records for deep linking
+      if (page.searchData.headings && Array.isArray(page.searchData.headings)) {
+        page.searchData.headings.forEach(heading => {
+          if (heading.id && heading.text) {
+            searchData.push({
+              id: `${pageId}#${heading.id}`,
+              title: `${page.searchData.title} > ${heading.text}`,
+              text: '', // The content under the heading could go here if we extracted it, but for now empty or short
+              headings: heading.text
+            });
+          }
+        });
+      }
     }
   });
 
