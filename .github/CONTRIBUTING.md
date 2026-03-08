@@ -55,6 +55,25 @@ Before submitting, ensure your changes haven't introduced regressions.
 3. **Verify:** Run `pnpm test` and ensure it outputs `✨ ALL SYSTEMS GO`.
 4. **Push & Open:** Open a Pull Request against the `main` branch.
 
-## 🤝 Code of Conduct
+### Copyright Header
+All source files in `packages/` must include the standard copyright header. If you create a new file, please copy the header from an existing file.
 
-By participating in this project, you agree to abide by our Code of Conduct. We strive to maintain a welcoming, respectful, and inclusive environment for all contributors.
+```html
+/*!
+ * --------------------------------------------------------------------
+ * docmd : the minimalist, zero-config documentation generator.
+ *
+ * @package     @docmd/core (and ecosystem)
+ * @website     https://docmd.io
+ * @repository  https://github.com/docmd-io/docmd
+ * @license     MIT
+ * @copyright   Copyright (c) 2025-present docmd.io
+ *
+ * [docmd-source] - Please do not remove this header.
+ * --------------------------------------------------------------------
+ */
+```
+
+## Code of Conduct
+
+Please note that this project operates with a standard Contributor Code of Conduct. By participating in this project you agree to abide by its terms, ensuring a welcoming and respectful environment for everyone.
