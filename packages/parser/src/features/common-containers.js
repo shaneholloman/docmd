@@ -95,7 +95,14 @@ function createDepthTrackingContainer(md, name, renderOpen, renderClose) {
     openToken.info = info;
 
     if (innerContent) {
+      // Flag the environment so the inner heading plugin skips generating permalinks & IDs
+      const oldIsInsideContainer = state.env.isInsideContainer;
+      state.env.isInsideContainer = true;
+
       const renderedContent = state.md.render(innerContent, state.env);
+
+      state.env.isInsideContainer = oldIsInsideContainer;
+
       const htmlToken = state.push('html_block', '', 0);
       htmlToken.content = renderedContent;
     }
