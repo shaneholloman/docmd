@@ -29,17 +29,29 @@ const { registerFeatures } = require('./features');
 
 // Custom Heading ID & Anchor Logic
 const headingIdPlugin = (md) => {
-  md.core.ruler.push('heading_anchors', function(state) {
+  md.core.ruler.push('heading_anchors', function (state) {
+    let containerDepth = 0;
+
     for (let i = 0; i < state.tokens.length; i++) {
       const token = state.tokens[i];
-      
+
+      // Track block-level inline containers (like steps)
+      if (token.type === 'steps_open' || (token.type.startsWith('custom_') && token.type.endsWith('_open'))) {
+        containerDepth++;
+      }
+      if (token.type === 'steps_close' || (token.type.startsWith('custom_') && token.type.endsWith('_close'))) {
+        containerDepth--;
+      }
+
+      const inContainer = state.env.isInsideContainer || containerDepth > 0;
+
       if (token.type === 'heading_open') {
         const level = parseInt(token.tag.slice(1), 10);
         const inlineToken = state.tokens[i + 1];
-        
-        // 1. Generate ID if not present
+
+        // 1. Generate ID if not present and NOT in a container
         let id = token.attrGet('id');
-        if (!id && inlineToken && inlineToken.content) {
+        if (!id && inlineToken && inlineToken.content && !inContainer) {
           id = inlineToken.content
             .toLowerCase()
             .replace(/\s+/g, '-')
@@ -50,15 +62,23 @@ const headingIdPlugin = (md) => {
           if (id) token.attrSet('id', id);
         }
 
+        // If we are in a container, strip existing IDs so they don't break the TOC parsing
+        if (inContainer) {
+          if (token.attrs) {
+            token.attrs = token.attrs.filter(a => a[0] !== 'id');
+          }
+          id = null;
+        }
+
         // 2. Inject Hover Anchor as an HTML Token (for H2, H3, H4)
-        if (id && level >= 2 && level <= 4) {
+        if (id && level >= 2 && level <= 4 && !inContainer) {
           let existingClass = token.attrGet('class') || '';
           token.attrSet('class', `${existingClass} docmd-heading`.trim());
 
           if (inlineToken && inlineToken.children) {
             const anchorToken = new state.Token('html_inline', '', 0);
             anchorToken.content = `<a href="#${id}" class="heading-anchor" aria-label="Permalink to this section"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-link2-icon lucide-link-2"><path d="M9 17H7A5 5 0 0 1 7 7h2m6 0h2a5 5 0 1 1 0 10h-2m-7-5h8"/></svg></a>`;
-            
+
             // Insert the anchor at the beginning of the heading text
             inlineToken.children.unshift(anchorToken);
           }
@@ -115,17 +135,17 @@ function createMarkdownProcessor(config = {}, pluginsCallback) {
     pluginsCallback(md);
   }
 
-  const defaultLinkOpen = md.renderer.rules.link_open || function(tokens, idx, options, env, self) {
+  const defaultLinkOpen = md.renderer.rules.link_open || function (tokens, idx, options, env, self) {
     return self.renderToken(tokens, idx, options);
   };
 
-  md.renderer.rules.link_open = function(tokens, idx, options, env, self) {
+  md.renderer.rules.link_open = function (tokens, idx, options, env, self) {
     const token = tokens[idx];
     const hrefIndex = token.attrIndex('href');
-    
+
     if (hrefIndex >= 0) {
       let href = token.attrs[hrefIndex][1];
-      
+
       const isExternal = href.match(/^(?:[a-z]+:|\/\/)/i);
       const isAsset = href.match(/(^|\/)assets\//);
       const isHashOnly = href.startsWith('#');
@@ -141,7 +161,7 @@ function createMarkdownProcessor(config = {}, pluginsCallback) {
 
         if (href.endsWith('.md')) {
           href = href.replace(/\.md$/, '');
-          
+
           // If the page was shifted into a subfolder (Clean URLs), we must traverse up one level
           if (!href.startsWith('/') && env && env.isIndex === false) {
             if (href.startsWith('./')) {
@@ -150,7 +170,7 @@ function createMarkdownProcessor(config = {}, pluginsCallback) {
               href = '../' + href;
             }
           }
-          
+
           token.attrs[hrefIndex][1] = href + hash;
         }
       }
@@ -168,7 +188,8 @@ function stripHtml(html) {
 
 function extractHeadings(html) {
   const headings = [];
-  const regex = /<h([1-6])[^>]*?id="([^"]*)"[^>]*?>([\s\S]*?)<\/h\1>/g;
+  // Require non-empty ID match to exclude stripped container headings: "([^"]+)"
+  const regex = /<h([1-6])[^>]*?id="([^"]+)"[^>]*?>([\s\S]*?)<\/h\1>/g;
   let match;
   while ((match = regex.exec(html)) !== null) {
     headings.push({
@@ -200,7 +221,7 @@ function processContent(rawString, mdInstance, config, env = {}) {
   let htmlContent, headings;
   if (frontmatter.noStyle === true) {
     htmlContent = markdownContent;
-    headings =[];
+    headings = [];
   } else {
     htmlContent = mdInstance.render(markdownContent, env);
     headings = extractHeadings(htmlContent);

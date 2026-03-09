@@ -141,8 +141,14 @@ function tabsRule(state, startLine, endLine, silent) {
     paneToken.attrs = [['class', `docmd-tab-pane ${index === 0 ? 'active' : ''}`]];
 
     if (tab.content) {
-      // Recurse parsing inside tabs
+      // Recurse parsing inside tabs and flag as inside container
+      const oldIsInsideContainer = state.env.isInsideContainer;
+      state.env.isInsideContainer = true;
+
       const renderedContent = state.md.render(tab.content, state.env);
+
+      state.env.isInsideContainer = oldIsInsideContainer;
+
       const htmlToken = state.push('html_block', '', 0);
       htmlToken.content = renderedContent;
     }
