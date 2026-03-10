@@ -1,9 +1,12 @@
 {
   "name": "@docmd/playground",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "private": true,
   "dependencies": {
-    "@docmd/core": "workspace:*"
+    "@docmd/core": "workspace:*",
+    "@docmd/plugin-search": "^0.5.3",
+    "is-even": "^1.0.0",
+    "is-odd": "^3.0.1"
   },
   "scripts": {
     "dev": "docmd dev",
