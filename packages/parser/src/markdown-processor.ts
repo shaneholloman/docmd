@@ -241,14 +241,8 @@ function processContent(rawString, mdInstance, config, env = {}) {
     if (h1Match) frontmatter.title = h1Match[1].trim();
   }
 
-  let htmlContent, headings;
-  if (frontmatter.noStyle === true) {
-    htmlContent = markdownContent;
-    headings = [];
-  } else {
-    htmlContent = mdInstance.render(markdownContent, env);
-    headings = extractHeadings(htmlContent);
-  }
+  const htmlContent = mdInstance.render(markdownContent, env);
+  const headings = extractHeadings(htmlContent);
 
   let searchData = null;
   if (!frontmatter.noindex) {

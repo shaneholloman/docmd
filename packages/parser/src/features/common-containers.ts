@@ -65,7 +65,7 @@ function createDepthTrackingContainer(md, name, renderOpen, renderClose) {
       }
 
       if (!fenceMarker) {
-        if (nextContent.match(/^:::\s+[a-zA-Z]/) && !nextContent.match(/^:::\s+button/)) {
+        if (nextContent.match(/^:::\s+[a-zA-Z]/) && !nextContent.match(/^:::\s+(button|embed)/)) {
           depth++;
         } else if (nextContent.match(/^:::\s*$/)) {
           depth--;

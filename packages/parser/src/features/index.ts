@@ -19,8 +19,9 @@ import changelog from './changelog.js';
 import buttons from './buttons.js';
 import basics from './basics.js';
 import embed from './embed.js';
+import hero from './hero.js';
 
-const FEATURES = [basics, buttons, embed, common, tabs, steps, changelog];
+const FEATURES = [basics, buttons, embed, common, tabs, steps, changelog, hero];
 
 function registerFeatures(md) {
   FEATURES.forEach(feature => {

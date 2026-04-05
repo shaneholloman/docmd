@@ -1,3 +1,17 @@
+/**
+ * --------------------------------------------------------------------
+ * docmd : the minimalist, zero-config documentation generator.
+ *
+ * @package     @docmd/core (and ecosystem)
+ * @website     https://docmd.io
+ * @repository  https://github.com/docmd-io/docmd
+ * @license     MIT
+ * @copyright   Copyright (c) 2025-present docmd.io
+ *
+ * [docmd-source] - Please do not remove this header.
+ * --------------------------------------------------------------------
+ */
+
 import { embed } from 'embed-lite';
 
 function embedRule(state: any, startLine: number, endLine: number, silent: boolean) {
@@ -5,7 +19,7 @@ function embedRule(state: any, startLine: number, endLine: number, silent: boole
   const max = state.eMarks[startLine];
   const lineContent = state.src.slice(start, max).trim();
 
-  const match = lineContent.match(/^:::\s+embed\s+(https?:\/\/\S+)$/i);
+  const match = lineContent.match(/^:::\s+embed\s+(?:\[|")?((https?:\/\/)[^\]"\s]+)(?:\]|")?$/i);
   if (!match) return false;
   if (silent) return true;
 
