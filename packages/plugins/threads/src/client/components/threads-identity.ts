@@ -7,8 +7,8 @@ import {
   getAvatarUrl, setAvatarUrl,
   computeAvatarUrl,
   computeAuthorKey, setAuthorKey,
-} from '../lib/identity.ts';
-import { upsertAuthor } from '../lib/api.ts';
+} from '../lib/identity';
+import { upsertAuthor } from '../lib/api';
 
 @customElement('threads-identity')
 export class ThreadsIdentity extends LitElement {

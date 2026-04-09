@@ -1,5 +1,5 @@
 import '@awesome.me/webawesome/dist/styles/themes/default.css';
-import './components/threads-app.ts';
+import './components/threads-app';
 
 function init(): void {
   if (document.querySelector('threads-app')) return;

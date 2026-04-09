@@ -1,14 +1,14 @@
 import { LitElement, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
-import type { Thread, Anchor, AuthorsMap } from '../../types.ts';
-import * as api from '../lib/api.ts';
-import { initIdentity, getIdentityPayload } from '../lib/identity.ts';
-import { computeAnchor, getSelectionPosition, isWithinContent } from '../lib/selection.ts';
-import { initThemeBridge } from '../lib/theme.ts';
+import type { Thread, Anchor, AuthorsMap } from '../../types';
+import * as api from '../lib/api';
+import { initIdentity, getIdentityPayload } from '../lib/identity';
+import { computeAnchor, getSelectionPosition, isWithinContent } from '../lib/selection';
+import { initThemeBridge } from '../lib/theme';
 
-import './threads-popover.ts';
-import './threads-inline-editor.ts';
-import './threads-identity.ts';
+import './threads-popover';
+import './threads-inline-editor';
+import './threads-identity';
 
 import '@awesome.me/webawesome/dist/components/dialog/dialog.js';
 import '@awesome.me/webawesome/dist/components/button/button.js';

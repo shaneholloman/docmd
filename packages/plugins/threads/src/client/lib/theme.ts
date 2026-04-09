@@ -1,4 +1,4 @@
-import { injectComponentStyles } from '../components/styles.ts';
+import { injectComponentStyles } from '../components/styles';
 
 const THEME_STYLE_ID = 'threads-theme-bridge';
 

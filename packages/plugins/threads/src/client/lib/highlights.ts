@@ -1,5 +1,5 @@
-import type { Thread, Anchor } from '../../types.ts';
-import { getContentArea } from './selection.ts';
+import type { Thread, Anchor } from '../../types';
+import { getContentArea } from './selection';
 
 interface AnchorResult {
   threadId: string;
