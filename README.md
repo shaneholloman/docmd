@@ -116,7 +116,7 @@ my-docs/
 | **`analytics`** | Core | **Included** | Zero-bloat Google Analytics tracking. |
 | **`llms`** | Core | **Included** | Generates `llms.txt` context files for AI agents. |
 | **`mermaid`** | Core | **Included** | Native support for Mermaid diagrams in your Markdown. |
-| **`threads`** | Optional | Installable | Adds collaborative, inline discussion threads to your pages.<br/>*Built by [@svallory](https://github.com/svallory).* |
+| **`threads`** | Optional | Installable | Adds collaborative, inline discussion threads to your pages.<br/>*Author: [@svallory](https://github.com/svallory).* |
 
 > **Tip:** To install an optional plugin like threads, you don't use `npm install`. Instead, use the `docmd` built-in installer: `npx docmd plugin add <plugin-name>`.
 

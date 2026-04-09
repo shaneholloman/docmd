@@ -3,7 +3,6 @@
   <!-- PROJECT TITLE -->
   <h3>
     <img src="https://github.com/docmd-io/docmd/blob/main/packages/ui/assets/images/docmd-logo-dark.png?raw=true" alt="docmd logo" width="210" />
-    <!-- docmd -->
   </h3>
   
   <!-- ONE LINE SUMMARY -->
@@ -29,7 +28,7 @@
     </h4>
   </p>
 
-   <!-- PREVIEW -->
+  <!-- PREVIEW -->
   <p>
     <br/>
     <img width="800" alt="docmd preview" src="https://github.com/user-attachments/assets/05a18bd2-6f85-4c7a-9fb7-1ae5b36573b2" />
@@ -103,6 +102,23 @@ my-docs/
 ├── docmd.config.js        # The docmd Configuration
 └── package.json           # Node.js Dependencies
 ```
+
+## Plugin Ecosystem
+
+`docmd` features a powerful, zero-config plugin system. Core plugins are included right out of the box, offering massive out-of-the-box value, while optional plugins can be installed to add specific features.
+
+| Plugin | Type | Status | Features |
+| :--- | :--- | :--- | :--- |
+| **`search`** | Core | **Included** | Instant, offline full-text search with fuzzy matching. |
+| **`pwa`** | Core | **Included** | Progressive Web App support for offline navigation. |
+| **`seo`** | Core | **Included** | Auto-generates SEO tags and Open Graph data. |
+| **`sitemap`** | Core | **Included** | Builds a standard `sitemap.xml` for search engines. |
+| **`analytics`** | Core | **Included** | Zero-bloat Google Analytics tracking. |
+| **`llms`** | Core | **Included** | Generates `llms.txt` context files for AI agents. |
+| **`mermaid`** | Core | **Included** | Native support for Mermaid diagrams in your Markdown. |
+| **`threads`** | Optional | Installable | Adds collaborative, inline discussion threads to your pages.<br/>*Author: [@svallory](https://github.com/svallory).* |
+
+> **Tip:** To install an optional plugin like threads, you don't use `npm install`. Instead, use the `docmd` built-in installer: `npx docmd plugin add <plugin-name>`.
 
 ## Configuration
 `docmd` provides a highly flexible API. Customize your site in seconds via `docmd.config.js`. Here is a robust example showing off our most powerful features:
@@ -196,7 +212,7 @@ await buildLive();
 ```
 
 ### Live Editor (`docmd live`)
-`docmd` features an isomorphic architecture. Running `npx @docmd/core live` builds a standalone web application where you can write Markdown and see the preview instantly without any server-side processing. 
+`docmd` features an isomorphic architecture. Running `npx @docmd/core live` builds a standalone web application where you can write Markdown and see the preview instantly without any server-side processing.
 
 > You can also try our **[docmd live](https://live.docmd.io)** editor online.
 
