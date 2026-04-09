@@ -1,4 +1,4 @@
-import type { Thread, Comment, Reaction, AuthorsMap } from '../../types.ts';
+import type { Thread, Comment, Reaction, AuthorsMap } from '../../types';
 
 declare global {
   var docmd: {

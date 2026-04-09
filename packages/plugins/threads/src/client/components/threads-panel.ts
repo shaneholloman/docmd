@@ -1,14 +1,14 @@
 import { LitElement, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import type { Thread, Anchor } from '../../types.ts';
+import type { Thread, Anchor } from '../../types';
 
 import '@awesome.me/webawesome/dist/components/button/button.js';
 import '@awesome.me/webawesome/dist/components/badge/badge.js';
 import '@awesome.me/webawesome/dist/components/icon/icon.js';
 import '@awesome.me/webawesome/dist/components/divider/divider.js';
 
-import './threads-thread.ts';
-import './threads-compose.ts';
+import './threads-thread';
+import './threads-compose';
 
 type FilterType = 'all' | 'open' | 'resolved';
 

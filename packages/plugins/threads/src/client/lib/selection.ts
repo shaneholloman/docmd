@@ -1,4 +1,4 @@
-import type { Anchor } from '../../types.ts';
+import type { Anchor } from '../../types';
 
 const CONTEXT_CHARS = 40;
 const BLOCK_ELEMENTS = new Set([

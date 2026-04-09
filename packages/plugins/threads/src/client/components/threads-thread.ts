@@ -1,13 +1,13 @@
 import { LitElement, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import type { Thread } from '../../types.ts';
+import type { Thread } from '../../types';
 
 import '@awesome.me/webawesome/dist/components/button/button.js';
 import '@awesome.me/webawesome/dist/components/divider/divider.js';
 import '@awesome.me/webawesome/dist/components/tag/tag.js';
 
-import './threads-comment.ts';
-import './threads-compose.ts';
+import './threads-comment';
+import './threads-compose';
 
 @customElement('threads-thread')
 export class ThreadsThread extends LitElement {
