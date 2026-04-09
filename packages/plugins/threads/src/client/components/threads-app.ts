@@ -307,14 +307,13 @@ export class ThreadsApp extends LitElement {
       mark.classList.add(colorClass);
       colorIndex++;
 
-      // 2. Move thread card inline (only when sidebar mode is OFF — the default)
-      if (!this.sidebarEnabled) {
-        const threadEl = document.querySelector<HTMLElement>(`.threads-thread[data-thread-id="${threadId}"]`);
-        if (threadEl) {
-          // Apply matching border color
-          threadEl.classList.add(colorClass.replace('threads-hl-', 'threads-border-'));
+      // 2. Apply matching border color to thread card (always, regardless of mode)
+      const threadEl = document.querySelector<HTMLElement>(`.threads-thread[data-thread-id="${threadId}"]`);
+      if (threadEl) {
+        threadEl.classList.add(colorClass.replace('threads-hl-', 'threads-border-'));
 
-          // Find the enclosing block element of the highlight
+        // 3. Move thread card inline only when sidebar mode is OFF (the default)
+        if (!this.sidebarEnabled) {
           let blockEl: Element | null = mark;
           while (blockEl && blockEl !== document.body) {
             if (blockEl instanceof HTMLElement && BLOCK_TAGS.has(blockEl.tagName)) {
@@ -329,7 +328,7 @@ export class ThreadsApp extends LitElement {
         }
       }
 
-      // 3. Click handler: scroll to thread and flash
+      // 4. Click handler: scroll to thread and flash
       mark.style.cursor = 'pointer';
       mark.addEventListener('click', () => {
         const el = document.querySelector(`.threads-thread[data-thread-id="${threadId}"]`);
@@ -341,17 +340,27 @@ export class ThreadsApp extends LitElement {
       });
     }
 
-    // 4. Inject reply buttons into all thread cards
+    // 5. Inject reply buttons into all thread cards
     this.injectReplyButtons();
 
-    // Hide the threads-sidebar only if all threads were moved out (inline mode)
+    // Handle sidebar visibility based on mode
+    const sidebar = document.querySelector('.threads-sidebar');
     if (!this.sidebarEnabled) {
-      const sidebar = document.querySelector('.threads-sidebar');
+      // Inline mode: hide the sidebar if all threads were moved out
       if (sidebar instanceof HTMLElement) {
         const remainingThreads = sidebar.querySelectorAll('.threads-thread');
         if (remainingThreads.length === 0) {
           sidebar.style.display = 'none';
         }
+      }
+    } else {
+      // Sidebar mode: add heading label if not already present
+      if (sidebar instanceof HTMLElement && !sidebar.querySelector('.threads-sidebar__heading')) {
+        sidebar.classList.add('threads-sidebar--labeled');
+        const heading = document.createElement('div');
+        heading.className = 'threads-sidebar__heading';
+        heading.textContent = 'Discussion Threads';
+        sidebar.insertBefore(heading, sidebar.firstChild);
       }
     }
   }

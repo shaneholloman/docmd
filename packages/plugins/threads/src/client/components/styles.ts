@@ -361,8 +361,24 @@ export function injectComponentStyles(): void {
     .tc-compose wa-textarea,
     .tc-thread__reply wa-textarea,
     .threads-thread wa-textarea {
-      width: 100%;
+      width: 100% !important;
       display: block;
+      box-sizing: border-box;
+    }
+    /* Force wa-textarea internal textarea to expand */
+    .tc-compose wa-textarea::part(base),
+    .tc-compose wa-textarea::part(textarea),
+    .tc-thread__reply wa-textarea::part(base),
+    .tc-thread__reply wa-textarea::part(textarea),
+    .threads-thread wa-textarea::part(base),
+    .threads-thread wa-textarea::part(textarea) {
+      width: 100% !important;
+      min-width: 0;
+      box-sizing: border-box;
+    }
+    .threads-thread .tc-compose {
+      width: 100%;
+      box-sizing: border-box;
     }
 
     /* ========= New thread compose ========= */
@@ -380,6 +396,19 @@ export function injectComponentStyles(): void {
       display: flex;
       flex-direction: column;
       gap: 12px;
+    }
+    .threads-sidebar--labeled {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--tc-border);
+    }
+    .threads-sidebar__heading {
+      font-family: var(--tc-font);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--tc-muted-fg);
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
     }
 
     /* ========= Server-rendered thread card ========= */
