@@ -29,6 +29,11 @@ export class ThreadsApp extends LitElement {
   private deleteTarget: { type: 'thread' | 'comment'; id: string; threadId?: string } | null = null;
   private inlineEditorEl: HTMLElement | null = null;
 
+  /** Whether sidebar mode is enabled via plugin config. Default: false (inline mode). */
+  private get sidebarEnabled(): boolean {
+    return !!(window as any).__threads_config?.sidebar;
+  }
+
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     document.removeEventListener('mouseup', this.handleMouseUp);
@@ -302,23 +307,25 @@ export class ThreadsApp extends LitElement {
       mark.classList.add(colorClass);
       colorIndex++;
 
-      // 2. Move thread card from the bottom threads-sidebar to after the enclosing block
-      const threadEl = document.querySelector<HTMLElement>(`.threads-thread[data-thread-id="${threadId}"]`);
-      if (threadEl) {
-        // Apply matching border color
-        threadEl.classList.add(colorClass.replace('threads-hl-', 'threads-border-'));
+      // 2. Move thread card inline (only when sidebar mode is OFF — the default)
+      if (!this.sidebarEnabled) {
+        const threadEl = document.querySelector<HTMLElement>(`.threads-thread[data-thread-id="${threadId}"]`);
+        if (threadEl) {
+          // Apply matching border color
+          threadEl.classList.add(colorClass.replace('threads-hl-', 'threads-border-'));
 
-        // Find the enclosing block element of the highlight
-        let blockEl: Element | null = mark;
-        while (blockEl && blockEl !== document.body) {
-          if (blockEl instanceof HTMLElement && BLOCK_TAGS.has(blockEl.tagName)) {
-            break;
+          // Find the enclosing block element of the highlight
+          let blockEl: Element | null = mark;
+          while (blockEl && blockEl !== document.body) {
+            if (blockEl instanceof HTMLElement && BLOCK_TAGS.has(blockEl.tagName)) {
+              break;
+            }
+            blockEl = blockEl.parentElement;
           }
-          blockEl = blockEl.parentElement;
-        }
 
-        if (blockEl && blockEl !== document.body) {
-          blockEl.insertAdjacentElement('afterend', threadEl);
+          if (blockEl && blockEl !== document.body) {
+            blockEl.insertAdjacentElement('afterend', threadEl);
+          }
         }
       }
 
@@ -337,12 +344,14 @@ export class ThreadsApp extends LitElement {
     // 4. Inject reply buttons into all thread cards
     this.injectReplyButtons();
 
-    // Hide the threads-sidebar only if all threads were moved out (to inline positions)
-    const sidebar = document.querySelector('.threads-sidebar');
-    if (sidebar instanceof HTMLElement) {
-      const remainingThreads = sidebar.querySelectorAll('.threads-thread');
-      if (remainingThreads.length === 0) {
-        sidebar.style.display = 'none';
+    // Hide the threads-sidebar only if all threads were moved out (inline mode)
+    if (!this.sidebarEnabled) {
+      const sidebar = document.querySelector('.threads-sidebar');
+      if (sidebar instanceof HTMLElement) {
+        const remainingThreads = sidebar.querySelectorAll('.threads-thread');
+        if (remainingThreads.length === 0) {
+          sidebar.style.display = 'none';
+        }
       }
     }
   }

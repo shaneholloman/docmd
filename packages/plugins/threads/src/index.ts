@@ -22,9 +22,13 @@ export function generateScripts(config: any, options?: any): { headScriptsHtml: 
     // File doesn't exist yet — that's fine
   }
 
+  const clientConfig = JSON.stringify({
+    sidebar: options?.sidebar === true,
+  });
+
   return {
     headScriptsHtml: '',
-    bodyScriptsHtml: `<script>window.__threads_authors=${authorsJson}</script>`
+    bodyScriptsHtml: `<script>window.__threads_authors=${authorsJson};window.__threads_config=${clientConfig}</script>`
   };
 }
 
