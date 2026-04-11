@@ -32,10 +32,11 @@ module.exports = defineConfig({
   // --- Layout & UI Architecture ---
   layout: {
     spa: true,
-    /*menubar: {
+    menubar: {
       enabled: true,
       position: 'header',
-    },*/
+      left: [ {text: 'Menu 1', url: '/'}, {text: 'Menu 2', url: '/nostyle'} ]
+    },
     header: {
       enabled: true
     },
@@ -44,7 +45,7 @@ module.exports = defineConfig({
       defaultCollapsed: false,
     },
     optionsMenu: {
-      position: 'header',
+      position: 'menubar',
       components: {
         search: true,
         themeSwitch: true,
@@ -59,6 +60,7 @@ module.exports = defineConfig({
   // --- Plugins ---
   plugins: {
     threads: {},
+    math: {},
     // pwa: {},
     // seo: {},
     // analytics: {},
@@ -81,6 +83,7 @@ module.exports = defineConfig({
     ]
   },
   navigation: [
-    { title: 'Latest Home', path: '/', icon: 'home' }
+    { title: 'Latest Home', path: '/', icon: 'home' },
+    { title: 'No Style Page', path: '/nostyle.md', icon: 'file' }
   ]
 });
