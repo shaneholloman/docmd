@@ -41,34 +41,8 @@ Verification content.
 - [ ] **UI:** Does the theme CSS apply to this page correctly?
 - [ ] **SPA:** Does navigation between pages work without a hard refresh?
 
-## Threads Plugin Test
+## Math Plugin Test
 
-This section tests the ==inline discussion threads=={t-thread1} plugin. You can ==highlight text=={t-thread2} and start discussions.
-
-Here is another paragraph with a ==different highlight=={t-thread3} to test multiple threads.
-
-::: threads
-  ::: thread t-thread1
-    ::: comment c1-1 "Alice" "2026-03-01"
-      This is a comment about inline discussion threads.
-    :::
-
-    ::: comment c1-2 "Bob" "2026-03-02"
-      Great point, Alice! I agree this is useful.
-    :::
-  :::
-  ::: thread t-thread2
-    ::: comment c2-1 "Charlie" "2026-03-03"
-      Highlighting text makes it easy to reference specific parts.
-    :::
-  :::
-  ::: thread t-thread3 resolved "Alice" "2026-03-05"
-    ::: comment c3-1 "Alice" "2026-03-04"
-      This highlight tests resolved threads.
-    :::
-
-    ::: comment c3-2 "Bob" "2026-03-05"
-      Resolved! Use `console.log()` for debugging.
-    :::
-  :::
-:::
+$$
+\sum_{i=1}^n i^2 = \frac{n(n+1)(2n+1)}{6}
+$$

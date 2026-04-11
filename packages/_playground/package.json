@@ -4,7 +4,7 @@
   "private": true,
   "dependencies": {
     "@docmd/core": "workspace:*",
-    "@docmd/plugin-threads": "workspace:*"
+    "@docmd/plugin-math": "workspace:*"
   },
   "scripts": {
     "dev": "node ../core/dist/bin/docmd.js dev",
