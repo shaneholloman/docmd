@@ -25,7 +25,12 @@
     "math",
     "latex",
     "katex",
-    "markdown"
+    "markdown",
+    "documentation",
+    "minimalist",
+    "zero-config",
+    "site-generator",
+    "docs"
   ],
   "author": {
     "name": "Ghazi",
