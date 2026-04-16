@@ -439,6 +439,7 @@ export async function renderPages({ config, srcDir, fallbackSrcDir, outputDir, h
       defaultLocale: config._defaultLocale || null,
       localePrefix: config._localeOutputPrefix || '',
       currentPagePath: navPath,
+      outputPrefix,
 
       // Translation function
       t,

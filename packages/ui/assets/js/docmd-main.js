@@ -143,16 +143,50 @@
       return;
     }
 
-    // Language Switcher Navigation (with localStorage persistence)
+    // Language Switcher Navigation (dynamic URL like version switching)
     const langLink = e.target.closest('.language-switcher-item');
     if (langLink) {
       e.preventDefault();
       var localeId = langLink.dataset.localeId;
       if (localeId) {
-        try { localStorage.setItem('docmd-locale', localeId); } catch(ex) { /* localStorage unavailable */ }
+        try { localStorage.setItem('docmd-locale', localeId); } catch (ex) { }
       }
-      // Full page load to the target locale root (SPA does not cross locales)
-      window.location.href = langLink.href;
+
+      // Compute target URL preserving current page path
+      var base = (window.DOCMD_BASE || '/').replace(/\/$/, '') + '/';
+      var currentLocale = window.DOCMD_LOCALE || '';
+      var defaultLocale = window.DOCMD_DEFAULT_LOCALE || '';
+      var currentPath = window.location.pathname;
+
+      // Strip base from current path
+      if (base !== '/' && currentPath.startsWith(base)) {
+        currentPath = currentPath.substring(base.length);
+      } else if (currentPath.startsWith('/')) {
+        currentPath = currentPath.substring(1);
+      }
+
+      // Strip current locale prefix from path
+      if (currentLocale && currentLocale !== defaultLocale && currentPath.startsWith(currentLocale + '/')) {
+        currentPath = currentPath.substring(currentLocale.length + 1);
+      }
+
+      // Build new path with target locale prefix
+      var targetLocPrefix = (localeId && localeId !== defaultLocale) ? localeId + '/' : '';
+      var targetHref = base + targetLocPrefix + currentPath;
+
+      // Smart check: verify the page exists in target locale
+      fetch(targetHref, { method: 'HEAD' })
+        .then(function (response) {
+          if (response.ok) {
+            window.location.href = targetHref + window.location.hash;
+          } else {
+            // Fallback: go to target locale root (preserve version prefix if present)
+            window.location.href = base + targetLocPrefix;
+          }
+        })
+        .catch(function () {
+          window.location.href = base + targetLocPrefix;
+        });
       return;
     }
 
@@ -401,7 +435,7 @@
                 try {
                   const absoluteUrl = new URL(newHref, data.finalUrl || window.location.href);
                   oldA.setAttribute('href', absoluteUrl.pathname + absoluteUrl.hash);
-                } catch(e) {
+                } catch (e) {
                   oldA.setAttribute('href', newHref);
                 }
               } else {
