@@ -18,10 +18,14 @@
         visibility: hidden;
       }
     </style>
-    <% let versionRoot='/' ; let siteRoot=relativePathToRoot; if (config.versions?.current && config._activeVersion?.id) {
-      const isSubVersion=config.versions.current !==config._activeVersion.id; versionRoot=isSubVersion ? '/' +
-        config._activeVersion.id + '/' : '/' ; if (isSubVersion) { siteRoot=(relativePathToRoot==='./' ? '' :
-        relativePathToRoot) + '../' ; } } if (locals.isOfflineMode) { versionRoot='' ;
+    <% let versionRoot='/' ; let siteRoot=relativePathToRoot; 
+      const _locPfx = (typeof localePrefix !== 'undefined' && localePrefix) ? localePrefix : '';
+      if (config.versions?.current && config._activeVersion?.id) {
+      const isSubVersion=config.versions.current !==config._activeVersion.id; 
+      versionRoot= '/' + _locPfx + (isSubVersion ? config._activeVersion.id + '/' : '');
+      if (isSubVersion) { siteRoot=(relativePathToRoot==='./' ? '' :
+        relativePathToRoot) + '../' ; } } else if (_locPfx) { versionRoot = '/' + _locPfx; }
+      if (locals.isOfflineMode) { versionRoot='' ;
       }
     %>
     <script>
