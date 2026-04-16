@@ -327,6 +327,15 @@ export async function renderPages({ config, srcDir, fallbackSrcDir, outputDir, h
     // Navigation Context
     let navPath = '/' + page.outputPath.replace(/\\/g, '/').replace(/\/index\.html$/, '').replace(/^index\.html$/, '');
     if (navPath === '/.') navPath = '/';
+    
+    // Strip outputPrefix (locale + version) from navPath so it matches navigation.json paths
+    if (outputPrefix) {
+      const prefixStr = '/' + outputPrefix.replace(/\/$/, '');
+      if (navPath.startsWith(prefixStr + '/') || navPath === prefixStr) {
+        navPath = navPath.substring(prefixStr.length) || '/';
+      }
+    }
+    
     const { prevPage, nextPage } = findPageNeighbors(config.navigation, navPath);
     const breadcrumbs = config.layout?.breadcrumbs !== false ? findBreadcrumbs(config.navigation, navPath) : [];
 
