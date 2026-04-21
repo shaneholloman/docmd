@@ -1,22 +1,20 @@
 {
   "name": "@docmd/monorepo",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "private": true,
   "description": "The minimalist, zero-config documentation generator monorepo.",
   "scripts": {
+    "dev": "pnpm docmd dev",
     "build": "pnpm -r run build",
-    "dev": "pnpm --filter @docmd/playground dev",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
+    "docmd": "pnpm --filter @docmd/playground exec docmd",
     "prep": "pnpm reset && pnpm verify",
     "verify": "node scripts/verify.js",
+    "lint": "eslint .",
     "bump": "node scripts/bump.js",
-    "reset": "node scripts/status.js start:reset && pnpm -s stop && pnpm -s unlink:global && pnpm -s clean && node scripts/status.js reset",
     "stop": "node packages/core/dist/bin/docmd.js stop >/dev/null 2>&1 || true",
     "clean": "rm -rf node_modules packages/*/node_modules packages/plugins/*/node_modules packages/*/dist packages/plugins/*/dist packages/*/public packages/plugins/*/public packages/*/site packages/plugins/*/site *.tsbuildinfo temp-* >/dev/null 2>&1;",
-    "unlink:global": "npm uninstall -g @docmd/core @docmd/monorepo docmd docmd-live -s >/dev/null 2>&1; pnpm uninstall -g @docmd/core @docmd/monorepo docmd docmd-live -s >/dev/null 2>&1; rm -f $(which docmd 2>/dev/null) $(which docmd-live 2>/dev/null);",
-    "pg:add": "pnpm --filter @docmd/playground exec docmd add",
-    "pg:remove": "pnpm --filter @docmd/playground exec docmd remove"
+    "unlink": "npm uninstall -g @docmd/core @docmd/monorepo docmd docmd-live -s >/dev/null 2>&1; pnpm uninstall -g @docmd/core @docmd/monorepo docmd docmd-live -s >/dev/null 2>&1; rm -f $(which docmd 2>/dev/null) $(which docmd-live 2>/dev/null);",
+    "reset": "node scripts/status.js start:reset && pnpm -s stop && pnpm -s unlink && pnpm -s clean && node scripts/status.js reset"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
