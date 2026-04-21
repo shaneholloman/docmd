@@ -74,8 +74,9 @@ npm install -g @docmd/core
 ```
 
 ```bash
-docmd dev    # iniciar servidor de desarrollo
-docmd build  # construir para despliegue
+docmd dev     # iniciar servidor de desarrollo
+docmd build   # construir para despliegue
+docmd deploy  # generar configs de docker, nginx o caddy
 ```
 
 ## Características
