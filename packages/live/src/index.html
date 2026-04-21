@@ -58,12 +58,12 @@
             <div class="pane-header">
                 <span>Markdown</span>
                 <div class="presets-bar">
-                    <button onclick="loadPreset('basics')">Basics</button>
-                    <button onclick="loadPreset('containers')">Callouts & Cards</button>
-                    <button onclick="loadPreset('tabs')">Tabs</button>
-                    <button onclick="loadPreset('steps')">Steps</button>
-                    <button onclick="loadPreset('mermaid')">Diagrams</button>
-                    <button onclick="loadPreset('math')">Math</button>
+                    <button class="active" onclick="loadPreset('basics', this)">Basics</button>
+                    <button onclick="loadPreset('containers', this)">Callouts & Cards</button>
+                    <button onclick="loadPreset('tabs', this)">Tabs</button>
+                    <button onclick="loadPreset('steps', this)">Steps</button>
+                    <button onclick="loadPreset('mermaid', this)">Diagrams</button>
+                    <button onclick="loadPreset('math', this)">Math</button>
                 </div>
             </div>
             <textarea id="input" spellcheck="false"></textarea>
@@ -106,9 +106,13 @@
         // Initialize with Basics
         if (!input.value) input.value = SNIPPETS.basics;
 
-        function loadPreset(key) {
+        function loadPreset(key, btn) {
             if (SNIPPETS[key]) {
                 input.value = SNIPPETS[key];
+                if (btn) {
+                    document.querySelectorAll('.presets-bar button').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                }
                 render();
             }
         }

@@ -42,7 +42,7 @@
     <%- metaTagsHtml || '' %>
       <title>
         <%= pageTitle %>
-        <% if (frontmatter.components?.siteTitle !==false && siteTitle && pageTitle !== siteTitle) { %> — <%= siteTitle %>
+        <% if (frontmatter.components?.siteTitle !==false && siteTitle && pageTitle !== siteTitle && !(frontmatter && frontmatter.titleAppend === false)) { %> : <%= siteTitle %>
         <% } %>
       </title>
       <% if (description && !(metaTagsHtml && metaTagsHtml.includes('name="description"'))) { %>

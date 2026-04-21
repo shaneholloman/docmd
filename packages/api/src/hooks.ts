@@ -15,9 +15,9 @@
 /**
  * Plugin loader with validation, isolation, and capability enforcement.
  *
- * §1 — Lightweight contract check at load time.
- * §2 — Every hook invocation wrapped in try/catch.
- * §3 — Plugins can only register for hooks they've declared.
+ * — Lightweight contract check at load time.
+ * — Every hook invocation wrapped in try/catch.
+ * — Plugins can only register for hooks they've declared.
  */
 
 import chalk from 'chalk';
