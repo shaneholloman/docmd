@@ -12,6 +12,9 @@
  * --------------------------------------------------------------------
  */
 
+import { renderIcon } from '../utils/icon-renderer.js';
+import { parseTitleAndIcon } from '../utils/container-helper.js';
+
 function smartDedent(str) {
   const lines = str.split('\n');
 
@@ -99,15 +102,15 @@ function tabsRule(state, startLine, endLine, silent) {
   for (let i = 0; i < lines.length; i++) {
     const rawLine = lines[i];
     const trimmedLine = rawLine.trim();
-    const tabMatch = trimmedLine.match(/^==\s*tab\s+(?:"([^"]+)"|(\S+))/);
+    const tabMatch = trimmedLine.match(/^==\s*tab\s+(.*)/);
 
     if (tabMatch) {
       if (currentTab) {
         currentTab.content = smartDedent(currentContentLines.join('\n'));
         tabs.push(currentTab);
       }
-      const title = tabMatch[1] || tabMatch[2];
-      currentTab = { title: title, content: '' };
+      const { title, icon } = parseTitleAndIcon(tabMatch[1]);
+      currentTab = { title, icon, content: '' };
       currentContentLines = [];
     } else if (currentTab) {
       currentContentLines.push(rawLine);
@@ -126,6 +129,9 @@ function tabsRule(state, startLine, endLine, silent) {
   tabs.forEach((tab, index) => {
     const navItemToken = state.push('tabs_nav_item', 'div', 0);
     navItemToken.attrs = [['class', `docmd-tabs-nav-item ${index === 0 ? 'active' : ''}`]];
+    if (tab.icon) {
+      navItemToken.attrs.push(['data-icon', tab.icon]);
+    }
     navItemToken.content = tab.title;
   });
   state.push('tabs_nav_close', 'div', -1);
@@ -164,7 +170,13 @@ export default {
     // Register Renderers
     md.renderer.rules.tabs_nav_open = () => '<div class="docmd-tabs-nav">';
     md.renderer.rules.tabs_nav_close = () => '</div>';
-    md.renderer.rules.tabs_nav_item = (tokens, idx) => `<div class="${tokens[idx].attrs[0][1]}">${md.renderInline(tokens[idx].content)}</div>`;
+    md.renderer.rules.tabs_nav_item = (tokens, idx) => {
+      const iconAttr = tokens[idx].attrs.find(a => a[0] === 'data-icon');
+      const icon = iconAttr ? iconAttr[1] : null;
+      const iconHtml = icon ? renderIcon(icon, { class: 'tab-icon' }) : '';
+      const className = tokens[idx].attrs.find(a => a[0] === 'class')[1];
+      return `<div class="${className}">${iconHtml}<span>${md.renderInline(tokens[idx].content)}</span></div>`;
+    };
     md.renderer.rules.tabs_content_open = () => '<div class="docmd-tabs-content">';
     md.renderer.rules.tabs_content_close = () => '</div>';
     md.renderer.rules.tab_pane_open = (tokens, idx) => `<div class="${tokens[idx].attrs[0][1]}">`;

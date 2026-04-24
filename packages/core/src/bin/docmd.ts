@@ -78,7 +78,7 @@ if (!command || values.help) {
   console.log(`  build           Build the static site for production`);
   console.log(`  dev             Start the development server`);
   console.log(`  live            Launch the Live Editor`);
-  console.log(`  migrate         Migrate legacy config to the new V2 structure`);
+  console.log(`  migrate         Migrate from Docusaurus, MkDocs, VitePress, or Astro Starlight`);
   console.log(`  deploy          Generate production deployment configurations`);
   console.log(`  stop            Kill all running background docmd dev servers`);
   console.log(`  add <plugin>    Install and configure a docmd plugin`);
@@ -123,7 +123,48 @@ if (command === 'init') {
     process.exit(1);
   });
 } else if (command === 'migrate') {
-  migrateProject(opts.config);
+  const migrateArgs = args.slice(args.indexOf('migrate') + 1);
+  const migrateOptions = {
+    docusaurus: { type: 'boolean' },
+    mkdocs: { type: 'boolean' },
+    vitepress: { type: 'boolean' },
+    starlight: { type: 'boolean' },
+    help: { type: 'boolean', short: 'h' }
+  } as const;
+
+  let migrateParsed;
+  try {
+    migrateParsed = parseArgs({ args: migrateArgs, options: migrateOptions, allowPositionals: false });
+  } catch (e: any) {
+    console.log(`\nArgument needed. Please specify a migration source.`);
+    console.log(`\nSources:`);
+    console.log(`  --docusaurus    Migrate from Docusaurus`);
+    console.log(`  --mkdocs        Migrate from MkDocs`);
+    console.log(`  --vitepress     Migrate from VitePress`);
+    console.log(`  --starlight     Migrate from Astro Starlight`);
+    process.exit(0);
+  }
+
+  const mv = migrateParsed.values;
+  if (mv.help || (!mv.docusaurus && !mv.mkdocs && !mv.vitepress && !mv.starlight)) {
+    console.log(`\nUsage: docmd migrate [options]\n`);
+    console.log(`Sources:`);
+    console.log(`  --docusaurus    Migrate from Docusaurus`);
+    console.log(`  --mkdocs        Migrate from MkDocs`);
+    console.log(`  --vitepress     Migrate from VitePress`);
+    console.log(`  --starlight     Migrate from Astro Starlight`);
+    process.exit(0);
+  }
+
+  migrateProject({ 
+    docusaurus: mv.docusaurus, 
+    mkdocs: mv.mkdocs, 
+    vitepress: mv.vitepress, 
+    starlight: mv.starlight 
+  }).catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
 } else if (command === 'deploy') {
   // Deploy has its own scoped flags — re-parse argv with deploy-specific options
   const deployArgs = args.slice(args.indexOf('deploy') + 1); // everything after "deploy"

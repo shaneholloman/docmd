@@ -100,6 +100,8 @@
     --link-color: #068ad5;
     --border-color: #27272a;
 
+    --border-color-codeblock: #fafafa17;
+
     --header-bg: rgba(9, 9, 11, 0.8);
     --header-border: #27272a;
     --sidebar-bg: #09090b;
@@ -1279,11 +1281,49 @@ pre {
     margin: var(--space-6) 0;
     background-color: var(--code-bg);
     border: 1px solid var(--border-color-codeblock);
-    box-shadow: var(--shadow-sm);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     white-space: pre;
     line-height: 1.5;
     font-size: .85em;
 }
+
+.docmd-code-block-wrapper {
+    margin: var(--space-6) 0;
+    border: 1px solid var(--border-color-codeblock);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    background-color: var(--code-bg);
+}
+
+.docmd-code-block-wrapper pre {
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.docmd-code-block-header {
+    display: flex;
+    align-items: center;
+    padding: var(--space-2) var(--space-4);
+    background-color: rgba(0, 0, 0, 0.04);
+    border-bottom: 1px solid var(--border-color-codeblock);
+}
+
+:root[data-theme=dark] .docmd-code-block-header {
+    background-color: rgba(255, 255, 255, 0.04);
+}
+
+.docmd-code-block-title {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-color);
+    font-family: var(--font-family-sans);
+}
+
+
 
 pre code {
     background-color: transparent;
@@ -1564,17 +1604,62 @@ html[data-theme=dark] .theme-toggle-button .icon-sun {
     content: "" !important
 }
 
-.mermaid-container {
-    margin: 1.5rem 0;
-    overflow-x: auto;
-    text-align: center
+.mermaid {
+    margin: var(--space-6) 0;
+    text-align: center;
 }
 
-.mermaid-container svg {
-    max-width: 100%;
-    height: auto;
-    display: inline-block
+.docmd-mermaid-container {
+    position: relative; /* Anchor for controls */
+    margin: var(--space-6) 0;
+    padding: var(--space-6) var(--space-4);
+    border: 1px solid var(--border-color-codeblock);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    background-color: var(--bg-color);
 }
+
+.mermaid-wrapper {
+    position: relative;
+    overflow: hidden; /* Hide scrollbars, we use drag-to-pan */
+    cursor: grab;
+}
+
+.mermaid-wrapper:active {
+    cursor: grabbing;
+}
+
+.mermaid-controls {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    display: flex;
+    gap: 4px;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.docmd-mermaid-container:hover .mermaid-controls,
+.mermaid-wrapper.mermaid-fullscreen .mermaid-controls {
+    opacity: 1;
+}
+
+.mermaid-wrapper.mermaid-fullscreen {
+    background-color: var(--bg-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    max-height: none;
+}
+
+.docmd-mermaid-container svg {
+    max-width: none; /* Let SVG size itself, wrapper will scroll */
+    display: block;
+    margin: 0 auto;
+}
+
+
 
 .mermaid-error {
     color: #e74c3c;
@@ -1975,7 +2060,17 @@ img.with-shadow {
     margin-bottom: -1px;
     font-weight: 500;
     color: var(--sidebar-text);
-    white-space: nowrap
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 8px
+}
+
+.tab-icon {
+    width: 1.1em;
+    height: 1.1em;
+    flex-shrink: 0;
+    stroke-width: 2px
 }
 
 .docmd-tabs-nav-item.active {
