@@ -24,6 +24,12 @@ import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.mi
   }
 
   async function renderAll() {
+    mermaid.registerIconPacks([
+      {
+        name: 'lucide',
+        loader: () => fetch('https://unpkg.com/@iconify-json/lucide@1/icons.json').then((res) => res.json()),
+      },
+    ]);
     mermaid.initialize({ startOnLoad: false, theme: getTheme(), securityLevel: 'loose' });
 
     const elements = document.querySelectorAll('.mermaid:not([data-processed="true"])') as NodeListOf<HTMLElement>;
@@ -32,16 +38,187 @@ import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.mi
       if (!el.dataset.original) el.dataset.original = el.textContent || '';
       const code = el.dataset.original;
 
-      // Skip elements that are strictly display:none (Wait for tab click)
       if (el.offsetParent === null) continue;
 
       try {
         const id = `mermaid-svg-${counter++}`;
-        // Generate SVG string in memory (prevents D3 bounding box crashes)
         const { svg } = await mermaid.render(id, code);
-        el.innerHTML = svg;
+
+        // Apply container class first to establish styling context
+        el.classList.add('docmd-mermaid-container');
+        el.innerHTML = '';
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'mermaid-wrapper';
+        wrapper.innerHTML = svg;
+
+        const svgEl = wrapper.querySelector('svg');
+
+        if (svgEl) {
+          // Remove natural constraints to prevent label clipping when scaled via CSS transform
+          svgEl.removeAttribute('style');
+          svgEl.style.maxWidth = 'none';
+          svgEl.style.maxHeight = 'none';
+          svgEl.style.transformOrigin = 'center';
+          svgEl.style.display = 'block';
+          svgEl.style.margin = '0 auto';
+        }
+
+        // Control buttons - appended to the OUTER container so they stay fixed!
+        const controls = document.createElement('div');
+        controls.className = 'mermaid-controls';
+
+        const btnStyle = 'background: var(--bg-color, #fff); border: 1px solid var(--border-color, #e4e4e7); border-radius: 6px; padding: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.08); width: 28px; height: 28px; color: var(--text-muted, #71717a);';
+
+        const zoomInBtn = document.createElement('button');
+        zoomInBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>';
+        zoomInBtn.style.cssText = btnStyle;
+        zoomInBtn.title = 'Zoom in';
+
+        const zoomOutBtn = document.createElement('button');
+        zoomOutBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>';
+        zoomOutBtn.style.cssText = btnStyle;
+        zoomOutBtn.title = 'Zoom out';
+
+        const resetBtn = document.createElement('button');
+        resetBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>';
+        resetBtn.style.cssText = btnStyle;
+        resetBtn.title = 'Reset view';
+
+        const fullscreenBtn = document.createElement('button');
+        fullscreenBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>';
+        fullscreenBtn.style.cssText = btnStyle;
+        fullscreenBtn.title = 'Fullscreen';
+
+        const upBtn = document.createElement('button');
+        upBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg>';
+        upBtn.style.cssText = btnStyle; upBtn.title = 'Pan Up';
+
+        const downBtn = document.createElement('button');
+        downBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+        downBtn.style.cssText = btnStyle; downBtn.title = 'Pan Down';
+
+        const leftBtn = document.createElement('button');
+        leftBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>';
+        leftBtn.style.cssText = btnStyle; leftBtn.title = 'Pan Left';
+
+        const rightBtn = document.createElement('button');
+        rightBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>';
+        rightBtn.style.cssText = btnStyle; rightBtn.title = 'Pan Right';
+
+        controls.appendChild(zoomInBtn);
+        controls.appendChild(zoomOutBtn);
+        controls.appendChild(upBtn);
+        controls.appendChild(downBtn);
+        controls.appendChild(leftBtn);
+        controls.appendChild(rightBtn);
+        controls.appendChild(resetBtn);
+        controls.appendChild(fullscreenBtn);
+        
+        el.appendChild(wrapper);
+        el.appendChild(controls);
+
+        let scale = 1;
+        let translateX = 0;
+        let translateY = 0;
+        let isDragging = false;
+        let startX = 0;
+        let startY = 0;
+
+        const updateTransform = (skipTransition = false) => {
+          if (svgEl) {
+            svgEl.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+            svgEl.style.transition = (isDragging || skipTransition) ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0, 0, 1)';
+          }
+        };
+
+        const initView = () => {
+          if (!svgEl) return;
+          scale = 1;
+          translateX = 0;
+          translateY = 0;
+          
+          // Let the SVG naturally size itself with max constraints
+          svgEl.style.maxWidth = '100%';
+          svgEl.style.maxHeight = '420px';
+          svgEl.style.transformOrigin = 'center';
+          wrapper.style.height = 'auto'; // Remove any dynamic height
+          
+          updateTransform(true);
+        };
+
+        initView();
+
+        const pan = (dx: number, dy: number) => {
+           translateX += dx;
+           translateY += dy;
+           updateTransform();
+        };
+
+        const zoom = (factor: number) => {
+           // Simple zoom from center
+           scale *= factor;
+           updateTransform();
+        };
+
+        zoomInBtn.addEventListener('click', () => zoom(1.25));
+        zoomOutBtn.addEventListener('click', () => zoom(1 / 1.25));
+        upBtn.addEventListener('click', () => pan(0, 50));
+        downBtn.addEventListener('click', () => pan(0, -50));
+        leftBtn.addEventListener('click', () => pan(50, 0));
+        rightBtn.addEventListener('click', () => pan(-50, 0));
+        resetBtn.addEventListener('click', () => { initView(); });
+
+        fullscreenBtn.addEventListener('click', () => {
+          if (!document.fullscreenElement) {
+            wrapper.requestFullscreen().catch(err => console.warn(err));
+          } else {
+            document.exitFullscreen();
+          }
+        });
+
+        document.addEventListener('fullscreenchange', () => {
+          if (document.fullscreenElement === wrapper) {
+            wrapper.classList.add('mermaid-fullscreen');
+            scale = 1;
+            translateX = 0;
+            translateY = 0;
+            updateTransform();
+          } else {
+            wrapper.classList.remove('mermaid-fullscreen');
+            initView();
+          }
+        });
+
+        wrapper.addEventListener('mousedown', (e) => {
+          isDragging = true;
+          startX = e.clientX - translateX;
+          startY = e.clientY - translateY;
+          wrapper.style.cursor = 'grabbing';
+        });
+
+        window.addEventListener('mousemove', (e) => {
+          if (!isDragging) return;
+          e.preventDefault(); // Prevent text selection
+          translateX = e.clientX - startX;
+          translateY = e.clientY - startY;
+          updateTransform();
+        });
+
+        const stopDrag = () => {
+          if (!isDragging) return;
+          isDragging = false;
+          wrapper.style.cursor = 'grab';
+          updateTransform(); // Trigger transition if needed
+        };
+
+        window.addEventListener('mouseup', stopDrag);
+        wrapper.addEventListener('mouseleave', stopDrag);
+
         el.setAttribute('data-processed', 'true');
-      } catch {
+
+      } catch (err) {
+        console.error(err);
         el.setAttribute('data-processed', 'error');
       }
     }
@@ -61,7 +238,7 @@ import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.mi
   document.addEventListener('click', (e) => {
     const target = e.target as HTMLElement | null;
     if (target?.closest('.docmd-tabs-nav-item, .collapsible-summary')) {
-      setTimeout(renderAll, 50); // Small delay to let CSS apply display:block
+      setTimeout(renderAll, 50);
     }
   });
 

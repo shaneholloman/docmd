@@ -13,6 +13,7 @@
  */
 
 import { renderIcon } from '../utils/icon-renderer.js';
+import { parseTitleAndIcon } from '../utils/container-helper.js';
 
 function smartDedent(str) {
   const lines = str.split('\n');
@@ -137,24 +138,6 @@ export function createDepthTrackingContainer(md, name, renderOpen, renderClose) 
   // Register Renderers
   md.renderer.rules[`custom_${name}_open`] = renderOpen;
   md.renderer.rules[`custom_${name}_close`] = renderClose;
-}
-
-/**
- * Extracts a quoted title (e.g., "My Title") and an optional icon (e.g., icon:rocket) from the info string.
- */
-function parseTitleAndIcon(info) {
-  if (!info) return { title: '', icon: '' };
-  let icon = '';
-  const iconMatch = info.match(/icon:([a-zA-Z0-9-]+)/);
-  if (iconMatch) {
-    icon = iconMatch[1];
-    info = info.replace(iconMatch[0], '');
-  }
-  
-  const titleMatch = info.match(/"([^"]*)"/);
-  const title = titleMatch ? titleMatch[1] : info.trim();
-  
-  return { title, icon };
 }
 
 export default {

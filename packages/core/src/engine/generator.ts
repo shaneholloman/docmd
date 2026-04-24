@@ -342,11 +342,14 @@ export async function renderPages({ config, srcDir, fallbackSrcDir, outputDir, h
     // Fix Neighbor Links
     const fixNeighbor = (node: any) => {
       if (!node) return null;
-      if (node.path.startsWith('http')) return node;
+      if (node.path.startsWith('http')) return { ...node, url: node.path };
       let p = node.path.replace(/^\//, '');
+      if (outputPrefix) {
+        const prefixStr = outputPrefix.replace(/\/$/, '');
+        if (prefixStr) p = p ? prefixStr + '/' + p : prefixStr;
+      }
       if (options.offline && !p.endsWith('.html')) p = p.replace(/\/$/, '') + '/index.html';
-      node.url = relativePathToRoot + p;
-      return node;
+      return { ...node, url: relativePathToRoot + p };
     };
 
     // Inject Assets

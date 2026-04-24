@@ -128,7 +128,7 @@ function createMarkdownProcessor(config: any = {}, pluginsCallback: any) {
     breaks: true,
   };
 
-  // Syntax Highlighting
+  // Syntax Highlighting (title extraction is handled separately in the fence renderer)
   const highlightFn = (str, lang) => {
     if (lang === 'mermaid') {
       return `<pre class="mermaid">${new MarkdownIt().utils.escapeHtml(str)}</pre>`;
@@ -160,6 +160,28 @@ function createMarkdownProcessor(config: any = {}, pluginsCallback: any) {
   if (typeof pluginsCallback === 'function') {
     pluginsCallback(md);
   }
+
+  // Custom Fence Renderer: Extracts title from token.info (e.g., ```js "filename.js")
+  // markdown-it only passes the first word as `lang` to highlight(), so the title
+  // in quotes never reaches the highlight function. We intercept it here instead.
+  const defaultFence = md.renderer.rules.fence.bind(md.renderer.rules);
+  md.renderer.rules.fence = function (tokens, idx, options, env, self) {
+    const token = tokens[idx];
+    const info = (token.info || '').trim();
+
+    // Match: language "title" or language 'title'
+    const titleMatch = info.match(/^[a-zA-Z0-9+#*-]*\s+["']([^"']+)["']/);
+
+    // Get the default rendered output (which includes the highlighted code)
+    const rendered = defaultFence(tokens, idx, options, env, self);
+
+    if (titleMatch) {
+      const title = titleMatch[1];
+      return `<div class="docmd-code-block-wrapper"><div class="docmd-code-block-header"><span class="docmd-code-block-title">${title}</span></div>${rendered}</div>`;
+    }
+
+    return rendered;
+  };
 
   const defaultLinkOpen = md.renderer.rules.link_open || function (tokens, idx, options, env, self) {
     return self.renderToken(tokens, idx, options);

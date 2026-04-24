@@ -41,6 +41,45 @@ Verification content.
 - [ ] **UI:** Does the theme CSS apply to this page correctly?
 - [ ] **SPA:** Does navigation between pages work without a hard refresh?
 
+## 🧜‍♀️ Mermaid Interactive Test
+
+Test the new interactive controls (Pan, Zoom, Fullscreen) and Lucide icon support here:
+
+### Complex Flowchart
+```mermaid
+graph TD
+    Start((Start)) --> Process1[Process One]
+    Process1 --> Decision{Is it valid?}
+    Decision -- Yes --> Process2[Process Two]
+    Decision -- No --> Error[Error Handling]
+    Process2 --> Subgraph1
+    subgraph Subgraph1 [Critical Path]
+        Step1[Step 1] --> Step2[Step 2]
+    end
+    Step2 --> End((End))
+    Error --> End
+```
+
+### Architecture Diagram (Lucide Icons)
+```mermaid
+architecture-beta
+    service db(lucide:database)[Database]
+    service api(lucide:server)[API Gateway]
+    service web(lucide:globe)[Web Server]
+    service app(lucide:smartphone)[Mobile App]
+
+    app:R -- L:api
+    web:R -- L:api
+    api:B -- T:db
+```
+
+### Code Block with Title
+```typescript "main.ts"
+function hello() {
+  console.log("Hello from docmd!");
+}
+```
+
 ## Math Plugin Test
 
 $$
