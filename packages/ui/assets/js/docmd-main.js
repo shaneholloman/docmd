@@ -180,26 +180,34 @@
       var targetLocPrefix = (localeId && localeId !== defaultLocale) ? localeId + '/' : '';
       var targetHref = base + targetLocPrefix + currentPath;
 
-      // Smart check: verify the page exists in target locale
+      // Normalize currentPath for manifest lookup: strip trailing slash, default to /
+      var lookupPath = '/' + currentPath.replace(/\/$/, '').replace(/\/index\.html$/, '');
+      if (lookupPath === '/') lookupPath = '/';
+
+      // Use build-time manifest for instant page-existence check (no network requests)
+      var manifest = window.DOCMD_LOCALE_PAGES;
+      if (manifest) {
+        var localePages = manifest[localeId];
+        if (localePages && localePages.indexOf(lookupPath) !== -1) {
+          // Page exists in target locale — navigate directly
+          window.location.href = targetHref + window.location.hash;
+        } else if (localePages && localePages.length > 0) {
+          // Locale exists but this page doesn't — go to locale root
+          window.location.href = base + targetLocPrefix;
+        } else {
+          // Locale has no pages at all — stay on current page
+          window.location.href = base + currentPath;
+        }
+        return;
+      }
+
+      // Fallback: no manifest available — use HEAD fetch (legacy/graceful degradation)
       fetch(targetHref, { method: 'HEAD' })
         .then(function (response) {
           if (response.ok) {
             window.location.href = targetHref + window.location.hash;
           } else {
-            // Fallback 1: try target locale root (preserve version prefix if present)
-            var localeRoot = base + targetLocPrefix;
-            fetch(localeRoot, { method: 'HEAD' })
-              .then(function (rootResponse) {
-                if (rootResponse.ok) {
-                  window.location.href = localeRoot;
-                } else {
-                  // Fallback 2: locale root doesn't exist either — stay on default locale's equivalent page
-                  window.location.href = base + currentPath;
-                }
-              })
-              .catch(function () {
-                window.location.href = base + currentPath;
-              });
+            window.location.href = base + targetLocPrefix;
           }
         })
         .catch(function () {

@@ -86,6 +86,41 @@ export async function buildSite(configPath: string, opts: any = {}) {
     // --- i18n ROOT REDIRECT ---
     await generateLocaleRedirect(config, rootOutputDir);
 
+    // --- i18n PAGE MANIFEST ---
+    // Emit a tiny JS file mapping locale IDs to their available page paths.
+    // The client-side language switcher uses this for instant page-existence
+    // checks — zero HEAD fetches, works offline, CDN-agnostic.
+    if (config.i18n && config.i18n.locales) {
+      const defaultLocale = config.i18n.default || '';
+      const localeIds = new Set(config.i18n.locales.map((l: any) => l.id));
+      const manifest: Record<string, string[]> = {};
+
+      for (const page of allGeneratedPages) {
+        const segments = page.outputPath.split('/');
+        const firstSeg = segments[0];
+        let localeId = defaultLocale;
+        let pagePath: string;
+
+        if (localeIds.has(firstSeg) && firstSeg !== defaultLocale) {
+          localeId = firstSeg;
+          pagePath = '/' + segments.slice(1).join('/');
+        } else {
+          pagePath = '/' + page.outputPath;
+        }
+
+        // Normalize: /index.html → /, /foo/index.html → /foo
+        pagePath = pagePath.replace(/\/index\.html$/, '') || '/';
+
+        if (!manifest[localeId]) manifest[localeId] = [];
+        manifest[localeId].push(pagePath);
+      }
+
+      const manifestJs = `window.DOCMD_LOCALE_PAGES=${JSON.stringify(manifest)};`;
+      const manifestPath = path.join(rootOutputDir, 'assets', 'js', 'docmd-i18n-manifest.js');
+      await fs.ensureDir(path.dirname(manifestPath));
+      await fs.writeFile(manifestPath, manifestJs);
+    }
+
     // --- 3. GENERATE CUSTOM 404 PAGE ---
     const { renderTemplateAsync } = await import('@docmd/parser/dist/html-renderer.js');
     const ui = await import('@docmd/ui');
