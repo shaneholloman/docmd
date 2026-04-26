@@ -5,16 +5,6 @@
   # ---------------------------------------------------------------
 %>
 
-<% 
-const footerBase = (config.base || '/').replace(/\/$/, '') + '/';
-const footerLocPrefix = (typeof localePrefix !== 'undefined' && localePrefix) ? localePrefix : '';
-function footerHref(item) { 
-  if (!item.url) return '#' ; 
-  if (item.external || item.url.startsWith('http')) return item.url; 
-  let clean=item.url.replace(/^\//, '' );
-  return footerBase + footerLocPrefix + clean; 
-}
-%>
 <% if (footerConfig?.style === 'complete') { %>
 <footer class="footer-complete">
   <div class="footer-complete-top">
@@ -38,7 +28,7 @@ function footerHref(item) {
                 <span class="footer-column-title"><%= col.title %></span>
                 <ul>
                   <% col.links.forEach(link => { %>
-                    <li><a href="<%= footerHref(link) %>" <%= link.external ? 'target="_blank" rel="noopener"' : '' %>><%= link.text %></a></li>
+                    <li><a href="<%= link.external ? link.url : buildRelativeUrl(link.url) %>" <%= link.external ? 'target="_blank" rel="noopener"' : '' %>><%= link.text %></a></li>
                   <% }) %>
                 </ul>
               </div>
