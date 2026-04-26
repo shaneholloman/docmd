@@ -41,8 +41,7 @@ export function normalizeConfig(userConfig: any) {
         config.logo = {
             light: config.logo,
             dark: config.logo,
-            alt: config.title || 'Logo',
-            href: '/'
+            alt: config.title || 'Logo'
         };
     }
 
@@ -77,6 +76,14 @@ export function normalizeConfig(userConfig: any) {
         branding: true,
         ...(userLayout.footer || (typeof legacyFooter === 'object' ? legacyFooter : {}))
     };
+
+    if (config.footer.columns && Array.isArray(config.footer.columns)) {
+        for (const col of config.footer.columns) {
+            if (col.links && Array.isArray(col.links)) {
+                normalizeMenubarPaths(col.links);
+            }
+        }
+    }
 
     // --- 3. Options Menu (Search, Theme, Sponsor) ---
     config.optionsMenu = {
