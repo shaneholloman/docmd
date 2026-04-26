@@ -343,17 +343,26 @@ export async function renderPages({ config, srcDir, fallbackSrcDir, outputDir, h
     const { prevPage, nextPage } = findPageNeighbors(config.navigation, navPath);
     const breadcrumbs = config.layout?.breadcrumbs !== false ? findBreadcrumbs(config.navigation, navPath) : [];
 
+    // Centralized URL Builder for all UI components
+    const buildRelativeUrl = (href: string) => {
+      if (!href || href === '#') return '#';
+      if (href.startsWith('http') || href.startsWith('//') || href.startsWith('mailto:')) return href;
+      
+      const cleanPath = href.replace(/^(\.\/|\/)+/, '');
+      const prefixStr = outputPrefix ? outputPrefix.replace(/\/$/, '') : '';
+      let combinedPath = prefixStr ? (cleanPath ? prefixStr + '/' + cleanPath : prefixStr) : cleanPath;
+      
+      if (options.offline && combinedPath !== '' && !combinedPath.endsWith('.html')) {
+        combinedPath = combinedPath.replace(/\/$/, '') + '/index.html';
+      }
+      
+      return relativePathToRoot + combinedPath;
+    };
+
     // Fix Neighbor Links
     const fixNeighbor = (node: any) => {
       if (!node) return null;
-      if (node.path.startsWith('http')) return { ...node, url: node.path };
-      let p = node.path.replace(/^\//, '');
-      if (outputPrefix) {
-        const prefixStr = outputPrefix.replace(/\/$/, '');
-        if (prefixStr) p = p ? prefixStr + '/' + p : prefixStr;
-      }
-      if (options.offline && !p.endsWith('.html')) p = p.replace(/\/$/, '') + '/index.html';
-      return { ...node, url: relativePathToRoot + p };
+      return { ...node, url: buildRelativeUrl(node.path) };
     };
 
     // Inject Assets
@@ -393,6 +402,7 @@ export async function renderPages({ config, srcDir, fallbackSrcDir, outputDir, h
       relativePathToRoot,
       outputPrefix,
       isOfflineMode: options.offline,
+      buildRelativeUrl,
       t
     }, { filename: ui.getTemplatePath('navigation') });
 
@@ -411,6 +421,7 @@ export async function renderPages({ config, srcDir, fallbackSrcDir, outputDir, h
       defaultMode: config.theme?.appearance || config.theme?.defaultMode || 'system',
       relativePathToRoot,
       isOfflineMode: options.offline,
+      buildRelativeUrl,
       navigationHtml,
       prevPage: fixNeighbor(prevPage),
       nextPage: fixNeighbor(nextPage),

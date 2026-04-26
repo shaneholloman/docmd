@@ -6,13 +6,8 @@
 %>
 
 <% 
-const menubarBase = (config.base || '/').replace(/\/$/, '') + '/';
-const menuLocPrefix = (typeof localePrefix !== 'undefined' && localePrefix) ? localePrefix : '';
 function menubarHref(item) { 
-  if (!item.url) return '#' ; 
-  if (item.external || item.url.startsWith('http')) return item.url; 
-  let clean=item.url.replace(/^\//, '' );
-  return menubarBase + menuLocPrefix + clean; 
+  return item.external ? item.url : buildRelativeUrl(item.url); 
 }
 function menubarTarget(item) { 
   return (item.external || (item.url && item.url.startsWith('http'))) ? ' target="_blank" rel="noopener noreferrer"' : '' ; 
