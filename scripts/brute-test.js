@@ -130,8 +130,8 @@ console.log('\n📦 Test 2: Zero-config with nested docs');
   const r = build(dir);
   assert('builds with nested dirs', r.ok);
   assert('generates 3 pages', countPages(dir) === 3);
-  assert('nested page exists', siteExists(dir, 'guide/index.html'));
-  assert('deep nested page exists', siteExists(dir, 'guide/advanced/index.html'));
+  assert('nested page exists', siteExists(dir, 'guide/intro/index.html'));
+  assert('deep nested page exists', siteExists(dir, 'guide/advanced/deep/index.html'));
 }
 
 // ─── TEST 3: i18n standalone (non-English default) ───
@@ -525,7 +525,7 @@ console.log('\n🏗️ Test 20: Deep nested structure');
   writeFile(dir, 'docs/a/b/c/d/deep.md', '# Deep Page\nVery deep.');
   const r = build(dir);
   assert('builds with deep nesting', r.ok);
-  assert('deep page exists', siteExists(dir, 'a/b/c/d/index.html'));
+  assert('deep page exists', siteExists(dir, 'a/b/c/d/deep/index.html'));
 }
 
 // ─── TEST 21: Zero-config auto-nav accuracy ───
@@ -602,6 +602,153 @@ console.log('\n📐 Test 25: Per-page layout override');
   const landing = readSite(dir, 'landing/index.html');
   assert('normal page has full layout', normal?.includes('sidebar') || normal?.includes('nav'));
   assert('landing page rendered', landing?.includes('Landing Page'));
+}
+
+// ─── TEST 26: URL Consistency (No Double Slashes) ───
+console.log('\n🔗 Test 26: URL Consistency (No Double Slashes)');
+{
+  const dir = setup('26-url-consistency');
+  writeFile(dir, 'docmd.config.js', `module.exports = {
+    title: 'URL Test',
+    url: 'https://example.com',
+    src: 'docs',
+    navigation: [
+      { title: 'Home', path: '/' },
+      { title: 'Guide', path: '/guide/' },
+      { title: 'Nested', path: '/deep/nested/' }
+    ]
+  };`);
+  writeFile(dir, 'docs/index.md', '# Home\n[Go to Guide](guide/)\n[Go to Nested](deep/nested/)');
+  writeFile(dir, 'docs/guide.md', '# Guide\n[Back Home](/)');
+  writeFile(dir, 'docs/deep/nested.md', '# Nested\n[Back Home](/)');
+  const r = build(dir);
+  assert('builds with navigation', r.ok);
+  
+  const idx = readSite(dir, 'index.html');
+  const guide = readSite(dir, 'guide/index.html');
+  const nested = readSite(dir, 'deep/nested/index.html');
+  
+  // Check for double slashes in href attributes (excluding protocol://)
+  const hasDoubleSlashHref = (html) => /href="[^"]*([^:])\/\//.test(html);
+  assert('index has no double-slash hrefs', !hasDoubleSlashHref(idx));
+  assert('guide has no double-slash hrefs', !hasDoubleSlashHref(guide));
+  assert('nested has no double-slash hrefs', !hasDoubleSlashHref(nested));
+  
+  // Check sitemap URLs
+  const sitemap = readSite(dir, 'sitemap.xml');
+  const hasDoubleSlash = (html) => /([^:])\/\//.test(html);
+  assert('sitemap has no double slashes', !hasDoubleSlash(sitemap));
+  assert('sitemap has correct root URL', sitemap?.includes('https://example.com/'));
+  assert('sitemap has correct guide URL', sitemap?.includes('https://example.com/guide/'));
+}
+
+// ─── TEST 27: Search Index URL Format ───
+console.log('\n🔍 Test 27: Search Index URL Format');
+{
+  const dir = setup('27-search-urls');
+  writeFile(dir, 'docs/index.md', '---\ntitle: Home\n---\n# Welcome');
+  writeFile(dir, 'docs/guide/intro.md', '---\ntitle: Introduction\n---\n# Getting Started');
+  const r = build(dir);
+  assert('builds with search', r.ok);
+  
+  const searchIdx = readSite(dir, 'search-index.json');
+  const parsed = JSON.parse(searchIdx);
+  const storedFields = parsed.storedFields || {};
+  const ids = Object.values(storedFields).map((f) => f.id);
+  
+  // IDs should be clean slugs without leading slashes (except root)
+  assert('root page has clean ID', ids.some(id => id === '/'));
+  assert('nested page has clean ID', ids.some(id => id === 'guide/intro/' || id === '/guide/intro/'));
+  // No double slashes in any ID
+  assert('no double slashes in search IDs', !ids.some(id => id.includes('//')));
+}
+
+// ─── TEST 28: i18n URL Prefixes ───
+console.log('\n🌍 Test 28: i18n URL Prefixes');
+{
+  const dir = setup('28-i18n-urls');
+  writeFile(dir, 'docmd.config.js', `module.exports = {
+    title: 'i18n URLs',
+    url: 'https://example.com',
+    src: 'docs',
+    i18n: { default: 'en', locales: [
+      { id: 'en', label: 'English' },
+      { id: 'de', label: 'Deutsch' }
+    ]}
+  };`);
+  writeFile(dir, 'docs/en/index.md', '# English Home\n[German](/de/)');
+  writeFile(dir, 'docs/en/guide.md', '# English Guide');
+  writeFile(dir, 'docs/en/navigation.json', '[{"title":"Home","path":"/"},{"title":"Guide","path":"/guide/"}]');
+  writeFile(dir, 'docs/de/index.md', '# German Home\n[English](/)');
+  writeFile(dir, 'docs/de/navigation.json', '[{"title":"Startseite","path":"/"}]');
+  const r = build(dir);
+  assert('builds with i18n', r.ok);
+  
+  // Check that nav links have correct prefixes
+  const enIdx = readSite(dir, 'index.html');
+  const deIdx = readSite(dir, 'de/index.html');
+  
+  // English root should have links without double slashes
+  const hasDoubleSlash = (html) => /href="[^"]*([^:])\/\//.test(html);
+  assert('EN index has no double-slash hrefs', !hasDoubleSlash(enIdx));
+  assert('DE index has no double-slash hrefs', !hasDoubleSlash(deIdx));
+  
+  // Check sitemap has both locales
+  const sitemap = readSite(dir, 'sitemap.xml');
+  assert('sitemap has EN URLs', sitemap?.includes('example.com/'));
+  assert('sitemap has DE URLs', sitemap?.includes('example.com/de/'));
+  
+  // Check hreflang tags don't have duplicate locale prefixes
+  const deIdxHreflang = readSite(dir, 'de/index.html');
+  const hreflangPattern = /hreflang="[^"]*" href="([^"]*)"/g;
+  const hreflangUrls = [...deIdxHreflang.matchAll(hreflangPattern)].map(m => m[1]);
+  assert('hreflang EN points to root', hreflangUrls.some(u => u === '/'));
+  assert('hreflang DE points to /de/', hreflangUrls.some(u => u === '/de/'));
+  assert('no duplicate locale in hreflang', !hreflangUrls.some(u => u.includes('/de/de/')));
+}
+
+// ─── TEST 29: Hreflang Tags Consistency ───
+console.log('\n🏷️ Test 29: Hreflang Tags Consistency');
+{
+  const dir = setup('29-hreflang-tags');
+  writeFile(dir, 'docmd.config.js', `module.exports = {
+    title: 'Hreflang Test',
+    url: 'https://example.com',
+    src: 'docs',
+    i18n: { default: 'en', locales: [
+      { id: 'en', label: 'English' },
+      { id: 'fr', label: 'Français' }
+    ]}
+  };`);
+  writeFile(dir, 'docs/en/index.md', '# English Home');
+  writeFile(dir, 'docs/en/guide.md', '# English Guide');
+  writeFile(dir, 'docs/en/navigation.json', '[{"title":"Home","path":"/"},{"title":"Guide","path":"/guide/"}]');
+  writeFile(dir, 'docs/fr/index.md', '# French Home');
+  writeFile(dir, 'docs/fr/guide.md', '# French Guide');
+  writeFile(dir, 'docs/fr/navigation.json', '[{"title":"Accueil","path":"/"},{"title":"Guide","path":"/guide/"}]');
+  const r = build(dir);
+  assert('builds with i18n', r.ok);
+  
+  // Check hreflang on English root
+  const enIdx = readSite(dir, 'index.html');
+  assert('EN root has hreflang for EN', enIdx?.includes('hreflang="en" href="/"'));
+  assert('EN root has hreflang for FR', enIdx?.includes('hreflang="fr" href="/fr/"'));
+  assert('EN root has x-default', enIdx?.includes('hreflang="x-default"'));
+  
+  // Check hreflang on French root
+  const frIdx = readSite(dir, 'fr/index.html');
+  assert('FR root has hreflang for EN', frIdx?.includes('hreflang="en" href="/"'));
+  assert('FR root has hreflang for FR', frIdx?.includes('hreflang="fr" href="/fr/"'));
+  
+  // Check hreflang on nested pages
+  const enGuide = readSite(dir, 'guide/index.html');
+  const frGuide = readSite(dir, 'fr/guide/index.html');
+  assert('EN guide has correct hreflang', enGuide?.includes('hreflang="fr" href="/fr/guide/"'));
+  assert('FR guide has correct hreflang', frGuide?.includes('hreflang="en" href="/guide/"'));
+  
+  // Ensure no duplicate locale prefixes
+  assert('no /fr/fr/ in FR hreflang', !frIdx?.includes('/fr/fr/'));
+  assert('no /fr/fr/ in FR guide hreflang', !frGuide?.includes('/fr/fr/'));
 }
 
 // ─── SUMMARY ───
