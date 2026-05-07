@@ -1,7 +1,7 @@
 {
   "name": "@docmd/core",
   "version": "0.7.9",
-  "description": "The zero-config documentation engine. Markdown to production docs in one command.",
+  "description": "Build production-ready documentation from Markdown in seconds. No React, no bloat, just content.",
   "type": "module",
   "browser": false,
   "main": "dist/index.js",
