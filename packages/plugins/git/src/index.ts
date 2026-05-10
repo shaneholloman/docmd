@@ -50,6 +50,14 @@ function initDiskCache() {
 function saveDiskCache() {
   if (!_cacheDirty || !_diskCachePath || !_diskCache) return;
   try {
+    // Prune entries for files that no longer exist on disk
+    const keys = Object.keys(_diskCache);
+    for (const key of keys) {
+      try {
+        if (!fs.existsSync(key)) delete _diskCache[key];
+      } catch { /* ignore stat errors */ }
+    }
+
     const cacheDir = path.dirname(_diskCachePath);
     if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
     fs.writeFileSync(_diskCachePath, JSON.stringify(_diskCache), 'utf8');
@@ -266,22 +274,30 @@ export async function onBeforeBuild(ctx: any): Promise<void> {
 
   if (showTui) tui.step('Syncing git metadata', 'WAIT');
 
+  // Parallel I/O with concurrency limit — git log is async I/O, not CPU-bound,
+  // so running multiple calls concurrently yields significant speedups on cold starts.
+  const CONCURRENCY = 10;
   let processed = 0;
-  for (const page of pages) {
-    const sourcePath = page?.sourcePath;
-    if (sourcePath && page.frontmatter) {
-      const gitInfo = await getGitFileInfo(sourcePath, maxCommits);
-      if (gitInfo) {
-        if (!commitHistory) {
-          gitInfo.commits = [];
-        }
-        page.frontmatter._git = gitInfo;
-      }
-    }
+  const total = pages.length;
 
-    processed++;
-    if (showTui && (processed % 10 === 0 || processed === pages.length)) {
-      tui.progress('Syncing git metadata', processed, pages.length);
+  for (let i = 0; i < total; i += CONCURRENCY) {
+    const batch = pages.slice(i, i + CONCURRENCY);
+    await Promise.all(batch.map(async (page: any) => {
+      const sourcePath = page?.sourcePath;
+      if (sourcePath && page.frontmatter) {
+        const gitInfo = await getGitFileInfo(sourcePath, maxCommits);
+        if (gitInfo) {
+          if (!commitHistory) {
+            gitInfo.commits = [];
+          }
+          page.frontmatter._git = gitInfo;
+        }
+      }
+    }));
+
+    processed += batch.length;
+    if (showTui) {
+      tui.progress('Syncing git metadata', processed, total);
     }
   }
 

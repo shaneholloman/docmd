@@ -38,6 +38,10 @@ export class WorkerPool extends EventEmitter {
 
   constructor(private workerScript: string, private workerData: any = {}, private poolSize: number = Math.max(1, os.cpus().length - 1)) {
     super();
+    // Each in-flight task registers 2 listeners (taskComplete + workerError).
+    // On high-throughput builds (900+ pages), this can exceed Node's default
+    // limit of 10 listeners. Set a generous cap to prevent spurious warnings.
+    this.setMaxListeners(this.poolSize * 4 + 50);
     // Workers are created lazily on first task submission to avoid
     // paying the heavy initialisation cost when the pool is never used.
   }
