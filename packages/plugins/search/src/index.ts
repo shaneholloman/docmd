@@ -25,7 +25,7 @@ const __dirname = path.dirname(__filename);
 
 export const plugin: PluginDescriptor = {
   name: 'search',
-  version: '0.7.9',
+  version: '0.8.0',
   capabilities: ['post-build', 'head', 'body', 'assets', 'translations']
 };
 
@@ -66,14 +66,52 @@ export function translations(localeId: string): Record<string, string> {
  * Post-build hook - generates per-locale search indexes.
  * Each locale gets its own `search-index.json` covering all versions within that locale.
  * Default locale index is at root, non-default locale indexes are at `/{locale}/search-index.json`.
+ *
+ * When a WorkerPool is available, the CPU-intensive MiniSearch indexing is
+ * offloaded to a worker thread via `runWorkerTask` to keep the main thread free.
  */
-export async function onPostBuild({ config, pages, outputDir, log }: any) {
+export async function onPostBuild({ config, pages, outputDir, tui, options, runWorkerTask }: any) {
   const isEnabled = config.optionsMenu ? config.optionsMenu.components.search !== false : config.search !== false;
   if (!isEnabled) return;
 
-  if (log) log('🔍 Generating search index...');
+  const showTui = tui && !options?.quiet;
+  if (showTui) tui.step('Generating search index', 'WAIT');
 
-  // Determine locale configuration
+  // Try to offload to worker thread for better main-thread responsiveness
+  if (runWorkerTask) {
+    try {
+      // Only send serializable page data the worker needs
+      const serializablePages = pages
+        .filter((p: any) => p.searchData)
+        .map((p: any) => ({ outputPath: p.outputPath, searchData: p.searchData }));
+
+      // Build a minimal serializable config for the worker
+      const workerConfig = {
+        i18n: config.i18n ? { locales: config.i18n.locales, default: config.i18n.default } : undefined,
+        versions: config.versions ? { all: config.versions.all, current: config.versions.current } : undefined,
+      };
+
+      const workerModulePath = path.resolve(__dirname, 'worker.js');
+      await runWorkerTask(workerModulePath, 'buildSearchIndex', [workerConfig, serializablePages, outputDir]);
+
+      if (showTui) tui.step('Generating search index', 'DONE');
+      return;
+    } catch {
+      // Worker failed — fall through to main-thread processing
+    }
+  }
+
+  // Main-thread fallback (or when WorkerPool isn't available)
+  await buildSearchIndexInline(config, pages, outputDir);
+
+  if (showTui) tui.step('Generating search index', 'DONE');
+}
+
+/**
+ * Inline (main-thread) search index builder — used as fallback when
+ * worker offloading is not available or fails.
+ */
+async function buildSearchIndexInline(config: any, pages: any[], outputDir: string) {
   const locales = config.i18n?.locales || [];
   const defaultLocale = config.i18n?.default || null;
   const hasVersioning = config.versions?.all?.length > 0;
@@ -91,7 +129,6 @@ export async function onPostBuild({ config, pages, outputDir, log }: any) {
     if (!page.searchData) continue;
     const outputPath = page.outputPath.replace(/\\/g, '/');
 
-    // Determine which locale this page belongs to
     let localeId = '_default';
     for (const loc of locales) {
       if (loc.id !== defaultLocale && outputPath.startsWith(loc.id + '/')) {
@@ -103,7 +140,6 @@ export async function onPostBuild({ config, pages, outputDir, log }: any) {
     localePages[localeId].push(page);
   }
 
-  // Build an index per locale
   for (const [localeId, locPages] of Object.entries(localePages)) {
     if (locPages.length === 0) continue;
 
@@ -111,35 +147,26 @@ export async function onPostBuild({ config, pages, outputDir, log }: any) {
     const seenIds = new Set();
 
     for (const page of locPages) {
-      // Use centralised URL utility for consistent slug generation.
-      // This is the single source of truth - no manual outputPath parsing.
       let pageId = outputPathToSlug(page.outputPath);
-      
-      // For search index, we want the slug without leading slash (except for root)
-      // This ensures clean concatenation in the client: ROOT_PATH + pageId
       if (pageId.startsWith('/') && pageId !== '/') {
         pageId = pageId.slice(1);
       }
 
-      // Detect version from the output path
       let version: string | null = null;
       if (hasVersioning && config.versions?.all) {
         for (const v of config.versions.all) {
-          // Check for version prefix: `hi/05/page` or `05/page`
           const stripped = localeId !== '_default' ? pageId.replace(new RegExp(`^${localeId}/`), '') : pageId;
           if (stripped.startsWith(v.id + '/') || stripped === v.id) {
             version = v.label || v.id;
             break;
           }
         }
-        // Current version pages have no prefix - tag them with the current label
         if (!version) {
           const currentVersion = config.versions.all.find((v: any) => v.id === currentVersionId);
           if (currentVersion) version = currentVersion.label || currentVersion.id;
         }
       }
 
-      // Add the main page record
       if (!seenIds.has(pageId)) {
         seenIds.add(pageId);
         const entry: any = {
@@ -152,7 +179,6 @@ export async function onPostBuild({ config, pages, outputDir, log }: any) {
         searchData.push(entry);
       }
 
-      // Add individual heading records for deep linking
       if (page.searchData.headings && Array.isArray(page.searchData.headings)) {
         for (const heading of page.searchData.headings) {
           if (heading.id && heading.text) {
@@ -173,7 +199,6 @@ export async function onPostBuild({ config, pages, outputDir, log }: any) {
       }
     }
 
-    // Build MiniSearch index
     const storeFields = ['title', 'id', 'text'];
     if (hasVersioning) storeFields.push('version');
 
@@ -186,7 +211,6 @@ export async function onPostBuild({ config, pages, outputDir, log }: any) {
     miniSearch.addAll(searchData);
     const json = JSON.stringify(miniSearch.toJSON());
 
-    // Write to the correct locale directory
     const indexPath = localeId === '_default'
       ? path.join(outputDir, 'search-index.json')
       : path.join(outputDir, localeId, 'search-index.json');

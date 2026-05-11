@@ -13,7 +13,7 @@
  */
 
 import path from 'path';
-import fs from '../utils/fs-utils.js';
+import { fsUtils as fs } from '@docmd/utils';
 import { createRequire } from 'module';
 import { execSync } from 'child_process';
 import { generateAssetTag, findFilesRecursive } from './assets.js';
@@ -22,8 +22,11 @@ import nativeFs from 'fs';
 
 const _require = createRequire(import.meta.url);
 import * as parser from '@docmd/parser';
+import { TUI } from '@docmd/tui';
 import { findPageNeighbors, findBreadcrumbs, normalizeNavPaths, createUrlContext, buildContextualUrl, computePageUrls, buildAbsoluteUrl, sanitizeUrl } from '@docmd/parser';
 import * as ui from '@docmd/ui';
+
+
 
 /* ── Constants ────────────────────────────────────────────────── */
 
@@ -113,7 +116,7 @@ export async function renderPages({ config, srcDir, fallbackSrcDir, outputDir, h
         }
       }
     } catch {
-      console.warn(`[docmd] Failed to parse locale navigation: ${localeNavPath}`);
+      TUI.warn(`Failed to parse locale navigation: ${localeNavPath}`);
     }
   }
 
@@ -334,7 +337,7 @@ export async function renderPages({ config, srcDir, fallbackSrcDir, outputDir, h
             rawContent = renderedBody;
           }
         } catch (e) {
-          console.warn(`[docmd] Skipping EJS render error in ${relativePath}: ${e.message}`);
+          TUI.warn(`Skipping EJS render error in ${relativePath}: ${(e as any).message}`);
           continue;
         }
       }
@@ -364,6 +367,28 @@ export async function renderPages({ config, srcDir, fallbackSrcDir, outputDir, h
     // Report progress after each batch
     processedCount += batch.length;
     if (onProgress) onProgress(processedCount, totalFiles);
+  }
+
+  // --- 2.5 onBeforeBuild (Data Indexing) ---
+  // Run hooks on every pass (each locale has its own page set).
+  // Show the section header only ONCE per top-level build to avoid
+  // reprinting it for every locale × version combination.
+  if (hooks.onBeforeBuild && hooks.onBeforeBuild.length > 0) {
+    const showSection = !options.targetFiles;
+    const beforeBuildContext = {
+      config,
+      pages,
+      tui: TUI,
+      options: showSection ? { ...options, quiet: false } : options,
+      runWorkerTask(modulePath: string, functionName: string, args: any[]) {
+        if (!config._workerPool) throw new Error('WorkerPool is not initialized');
+        return config._workerPool.runTask({ type: 'plugin-task', modulePath, functionName, args });
+      }
+    };
+    for (const hookFn of hooks.onBeforeBuild) {
+      await hookFn(beforeBuildContext);
+    }
+    // Section stays open — build.ts closes it after appending search.
   }
 
   // --- 3. Render HTML (parallel template rendering + batched writes) ---

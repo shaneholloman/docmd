@@ -18,15 +18,15 @@ import type { PluginDescriptor } from '@docmd/api';
 
 export const plugin: PluginDescriptor = {
   name: 'pwa',
-  version: '0.7.9',
-  capabilities: ['post-build']
+  version: '0.8.0',
+  capabilities: ['post-build', 'head', 'body']
 };
 
 export async function onPostBuild({ config, outputDir, log }: any) {
   const pwaConfig = config.plugins?.pwa || {};
   if (pwaConfig.enabled === false) return; // Enabled by default if loaded
 
-  if (log) log('📱 Generating PWA assets...');
+  if (log) log('Generating PWA assets');
 
   let icons = pwaConfig.icons;
   if (!icons) {

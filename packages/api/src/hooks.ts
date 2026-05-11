@@ -47,7 +47,7 @@ const CAPABILITY_HOOKS: Record<Capability, string[]> = {
   events:       ['events'],
   translations: ['translations'],
   init:         ['onConfigResolved'],
-  build:        ['onBeforeParse', 'onAfterParse', 'onBeforeRender', 'onPageReady'],
+  build:        ['onBeforeParse', 'onAfterParse', 'onBeforeBuild', 'onBeforeRender', 'onPageReady'],
   dev:          ['onDevServerReady'],
 };
 
@@ -70,6 +70,7 @@ export const hooks: PluginHooks = {
   onDevServerReady: [],
   onBeforeParse: [],
   onAfterParse: [],
+  onBeforeBuild: [],
   onBeforeRender: [],
   onPageReady: [],
 };
@@ -292,6 +293,7 @@ export async function loadPlugins(config: any, opts?: { resolvePaths?: string[] 
   hooks.onDevServerReady = [];
   hooks.onBeforeParse = [];
   hooks.onAfterParse = [];
+  hooks.onBeforeBuild = [];
   hooks.onBeforeRender = [];
   hooks.onPageReady = [];
   pluginErrors.length = 0;
@@ -338,32 +340,34 @@ export async function loadPlugins(config: any, opts?: { resolvePaths?: string[] 
       let needsAutoInstall = false;
       
       try {
-        const resolvedPath = require.resolve(name, { paths: resolvePaths });
-        rawModule = await import(pathToFileURL(resolvedPath).href);
-      } catch (e: any) {
-        // Monorepo fallback: if it's an official plugin, try packages/plugins/{id}
+        let loadedFromMonorepo = false;
+
+        // 1. Monorepo Priority: if it's an official plugin, try local monorepo source first.
+        // This prevents older versions installed in project node_modules from taking
+        // precedence during monorepo development.
         if (name.startsWith('@docmd/plugin-')) {
           const id = name.replace('@docmd/plugin-', '');
           const localPath = path.resolve(__monorepoRoot, 'packages/plugins', id, 'dist/index.js');
           if (nativeFs.existsSync(localPath)) {
             rawModule = await import(pathToFileURL(localPath).href);
-          } else {
-            // Mark for auto-install if it's an official plugin not found
-            needsAutoInstall = true;
+            loadedFromMonorepo = true;
           }
         }
 
-        if (!rawModule && !needsAutoInstall) {
+        // 2. Standard NPM Resolution: if not found locally, use Node's resolution
+        if (!loadedFromMonorepo) {
+          const resolvedPath = require.resolve(name, { paths: resolvePaths });
+          rawModule = await import(pathToFileURL(resolvedPath).href);
+        }
+      } catch (e: any) {
+        if (name.startsWith('@docmd/plugin-')) {
+          needsAutoInstall = true;
+        } else {
           // Fallback for non-package plugins or when resolution fails
           try {
             rawModule = await import(name);
           } catch (innerError: any) {
-            // For official plugins, attempt auto-install
-            if (name.startsWith('@docmd/plugin-')) {
-              needsAutoInstall = true;
-            } else {
-              throw new Error(`Failed to resolve ${name}. Search paths: ${resolvePaths.join(', ')}. Detail: ${innerError.message}`);
-            }
+            throw new Error(`Failed to resolve ${name}. Search paths: ${resolvePaths.join(', ')}. Detail: ${innerError.message}`);
           }
         }
       }
@@ -495,14 +499,18 @@ function registerPlugin(name: string, plugin: PluginModule, options: any) {
   if (typeof plugin.onPostBuild === 'function') {
     if (hasCapabilityForHook(descriptor, 'onPostBuild')) {
       const fn = plugin.onPostBuild;
-      hooks.onPostBuild.push(async (ctx: any) => {
+      const wrapper = async (ctx: any) => {
         try {
-          await fn({ ...ctx, options });
+          await fn(ctx);
         } catch (err: any) {
           TUI.error(`Plugin "${name}" threw in onPostBuild`, err.message);
           pluginErrors.push({ plugin: name, hook: 'onPostBuild', message: err.message });
         }
-      });
+      };
+      // Tag with the plugin's own declared name (e.g. 'search', 'sitemap')
+      // so build.ts can split hooks into indexing vs publishing phases.
+      (wrapper as any)._pluginName = descriptor?.name || shortName;
+      hooks.onPostBuild.push(wrapper);
     } else {
       TUI.warn(`Plugin "${shortName}" exports onPostBuild but didn't declare "post-build" capability - skipped`);
     }
@@ -615,6 +623,23 @@ function registerPlugin(name: string, plugin: PluginModule, options: any) {
       });
     } else {
       TUI.warn(`Plugin "${shortName}" exports onAfterParse but didn't declare "build" capability - skipped`);
+    }
+  }
+
+  // onBeforeBuild
+  if (typeof (plugin as any).onBeforeBuild === 'function') {
+    if (hasCapabilityForHook(descriptor, 'onBeforeBuild')) {
+      const fn = (plugin as any).onBeforeBuild;
+      hooks.onBeforeBuild.push(async (ctx: any) => {
+        try {
+          await fn(ctx);
+        } catch (err: any) {
+          TUI.error(`Plugin "${name}" threw in onBeforeBuild`, err.message);
+          pluginErrors.push({ plugin: name, hook: 'onBeforeBuild', message: err.message });
+        }
+      });
+    } else {
+      TUI.warn(`Plugin "${shortName}" exports onBeforeBuild but didn't declare "build" capability - skipped`);
     }
   }
 

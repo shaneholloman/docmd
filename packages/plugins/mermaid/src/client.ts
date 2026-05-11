@@ -18,19 +18,31 @@ import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.mi
 (async function () {
   'use strict';
   let counter = 0;
+  let iconsRegistered = false;
+
 
   function getTheme() {
     return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
   }
 
   async function renderAll() {
-    mermaid.registerIconPacks([
-      {
-        name: 'icon',
-        loader: () => fetch('https://unpkg.com/@iconify-json/lucide@1/icons.json').then((res) => res.json()),
-      },
-    ]);
+    if (!iconsRegistered) {
+      try {
+        mermaid.registerIconPacks([
+          {
+            name: 'icon',
+            loader: () => fetch('https://unpkg.com/@iconify-json/lucide@1/icons.json').then((res) => res.json()),
+          },
+        ]);
+        iconsRegistered = true;
+      } catch (e) {
+        console.warn('Mermaid icon registration failed:', e);
+      }
+    }
     mermaid.initialize({ startOnLoad: false, theme: getTheme(), securityLevel: 'loose' });
+
+    // Ensure DOM is settled
+    await new Promise(resolve => requestAnimationFrame(resolve));
 
     const elements = document.querySelectorAll('.mermaid:not([data-processed="true"])') as NodeListOf<HTMLElement>;
 
@@ -38,7 +50,6 @@ import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.mi
       if (!el.dataset.original) el.dataset.original = el.textContent || '';
       const code = el.dataset.original;
 
-      if (el.offsetParent === null) continue;
 
       try {
         const id = `mermaid-svg-${counter++}`;
@@ -105,8 +116,6 @@ import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.mi
         const rightBtn = document.createElement('button');
         rightBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>';
         rightBtn.style.cssText = btnStyle; rightBtn.title = 'Pan Right';
-        controls.style.flexDirection = 'column';
-        controls.style.alignItems = 'flex-end';
         controls.style.gap = '4px';
 
         const row1 = document.createElement('div');
@@ -126,8 +135,8 @@ import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.mi
         controls.appendChild(row1);
         controls.appendChild(row2);
         
+        wrapper.appendChild(controls);
         el.appendChild(wrapper);
-        el.appendChild(controls);
 
         let scale = 1;
         let translateX = 0;
@@ -150,6 +159,8 @@ import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.mi
           translateY = 0;
           
           // Let the SVG naturally size itself with max constraints
+          svgEl.style.width = '';
+          svgEl.style.height = '';
           svgEl.style.maxWidth = '100%';
           svgEl.style.maxHeight = '420px';
           svgEl.style.transformOrigin = 'center';
@@ -189,8 +200,13 @@ import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.mi
         });
 
         document.addEventListener('fullscreenchange', () => {
+          if (!svgEl) return;
           if (document.fullscreenElement === wrapper) {
             wrapper.classList.add('mermaid-fullscreen');
+            svgEl.style.maxWidth = 'calc(100vw - 40px)';
+            svgEl.style.maxHeight = 'calc(100vh - 40px)';
+            svgEl.style.width = '100%';
+            svgEl.style.height = '100%';
             scale = 1;
             translateX = 0;
             translateY = 0;
