@@ -37,7 +37,7 @@
  */
 
 import path from 'path';
-import fs from '../utils/fs-utils.js';
+import { fsUtils as fs } from '@docmd/utils';
 import nativeFs from 'fs';
 import { TUI } from '@docmd/tui';
 import { loadConfig } from '../utils/config-loader.js';
@@ -56,6 +56,8 @@ export interface MultiProjectConfig {
   projects: ProjectEntry[];
   /** Shared output directory. Default: 'site' */
   out?: string;
+  /** Internal: Absolute path to the config file itself. Used for hot-reloading. */
+  _resolvedPath?: string;
 }
 
 /* ── Detection ─────────────────────────────────────────────── */
@@ -77,30 +79,57 @@ export function isMultiProject(rawConfig: any): rawConfig is MultiProjectConfig 
  * Load the raw config file without normalization to check for projects.
  * Returns null if no config found or if it's not multi-project.
  */
-export async function detectMultiProject(configPath: string): Promise<MultiProjectConfig | null> {
+export async function detectMultiProject(configPathOption: string): Promise<MultiProjectConfig | null> {
   const CWD = process.cwd();
-  const absolutePath = path.resolve(CWD, configPath);
+  let absolutePath = path.resolve(CWD, configPathOption);
 
-  if (!nativeFs.existsSync(absolutePath)) return null;
+  if (configPathOption === 'docmd.config.js') {
+    const candidates = [
+      'docmd.config.json',
+      'docmd.config.ts',
+      'docmd.config.js',
+      'docmd.config.mjs',
+      'config.js'
+    ];
+    let found = false;
+    for (const c of candidates) {
+      const p = path.resolve(CWD, c);
+      if (nativeFs.existsSync(p)) {
+        absolutePath = p;
+        found = true;
+        break;
+      }
+    }
+    if (!found) return null;
+  } else if (!nativeFs.existsSync(absolutePath)) {
+    return null;
+  }
 
   try {
-    // Polyfill defineConfig
-    (global as any).defineConfig = (config: any) => config;
+    let rawConfig: any;
 
-    const ts = Date.now();
-    const ext = path.extname(absolutePath);
-    const tempPath = absolutePath.replace(new RegExp(`\\${ext}$`), `-${ts}${ext}`);
-    nativeFs.copyFileSync(absolutePath, tempPath);
+    if (absolutePath.endsWith('.json')) {
+      rawConfig = JSON.parse(nativeFs.readFileSync(absolutePath, 'utf-8'));
+    } else {
+      // Polyfill defineConfig
+      (global as any).defineConfig = (config: any) => config;
 
-    const { pathToFileURL } = await import('url');
-    const configUrl = pathToFileURL(tempPath).href;
-    const rawModule = await import(configUrl);
-    const rawConfig = rawModule.default || rawModule;
+      const ts = Date.now();
+      const ext = path.extname(absolutePath);
+      const tempPath = absolutePath.replace(new RegExp(`\\${ext}$`), `-${ts}${ext}`);
+      nativeFs.copyFileSync(absolutePath, tempPath);
 
-    nativeFs.unlinkSync(tempPath);
-    delete (global as any).defineConfig;
+      const { pathToFileURL } = await import('url');
+      const configUrl = pathToFileURL(tempPath).href;
+      const rawModule = await import(configUrl);
+      rawConfig = rawModule.default || rawModule;
+
+      nativeFs.unlinkSync(tempPath);
+      delete (global as any).defineConfig;
+    }
 
     if (isMultiProject(rawConfig)) {
+      rawConfig._resolvedPath = absolutePath;
       return rawConfig as MultiProjectConfig;
     }
     return null;
@@ -217,17 +246,35 @@ export async function buildMultiProject(
     const label = prefix === '/' ? `/ (root)` : prefix;
     const projectElapsed = TUI.timer();
 
-    if (!opts.quiet) {
-      TUI.section(`Building: ${label}`);
-      TUI.item('Source', `${project.src}/`, TUI.dim, TUI.cyan);
-      TUI.item('Output', `${path.relative(CWD, projectOutDir)}/`, TUI.dim, TUI.cyan);
-    }
-
     // Check if the project has its own config
     const hasProjectConfig = nativeFs.existsSync(projectConfigPath);
 
-    if (!hasProjectConfig && !opts.quiet) {
-      TUI.item('Config', 'zero-config (no docmd.config.js found)', TUI.dim, TUI.cyan);
+    if (!opts.quiet) {
+      TUI.section(`Building: ${label}`);
+
+      // Load the child config to extract version/locale details
+      const originalCwdCheck = process.cwd();
+      process.chdir(projectSrcDir);
+      try {
+        const childConfig = await loadConfig(hasProjectConfig ? 'docmd.config.js' : 'docmd.config.js', { isDev: opts.isDev, quiet: true });
+        const childDetails = TUI.extractProjectDetails(childConfig, projectOutDir, CWD);
+        TUI.projectDetails({
+          source: `${project.src}/`,
+          output: `${path.relative(CWD, projectOutDir)}/`,
+          versions: childDetails.versions,
+          locales: childDetails.locales,
+        });
+      } catch {
+        // Fallback: just show source/output if config loading fails
+        TUI.item('Source', `${project.src}/`, TUI.dim, TUI.cyan);
+        TUI.item('Output', `${path.relative(CWD, projectOutDir)}/`, TUI.dim, TUI.cyan);
+      } finally {
+        process.chdir(originalCwdCheck);
+      }
+
+      if (!hasProjectConfig) {
+        TUI.item('Config', 'zero-config (no docmd.config.js found)', TUI.dim, TUI.cyan);
+      }
     }
 
     // Change to project directory and build
@@ -254,29 +301,18 @@ export async function buildMultiProject(
       const configFile = hasProjectConfig ? 'docmd.config.js' : 'docmd.config.js';
 
       await buildSite(configFile, {
-        isDev: opts.isDev || false,
+        isDev:   opts.isDev   || false,
         offline: opts.offline || false,
-        quiet: true,          // Suppress child's own section headers/summary
-        showStats: !opts.quiet,    // But still show versions/locales in parent's section
-        onProgress: !opts.quiet ? (current: number, total: number) => {
-          TUI.progress(`Processing     `, current, total);
-        } : undefined,
+        quiet:   true,  // Projects.ts owns all section headers
       });
-
-      if (!opts.quiet) {
-        TUI.step(`Project ${label} built in ${projectElapsed()}`, 'DONE', TUI.cyan);
-        TUI.footer(TUI.cyan);
-      }
 
     } catch (err: any) {
       if (!opts.quiet) {
         TUI.step(`Project ${label} build failed`, 'FAIL', TUI.cyan);
-        TUI.footer(TUI.cyan);
       }
       TUI.error(`Build failed for ${label}`, err.message);
       if (!opts.isDev) throw err;
     } finally {
-      // Always restore CWD
       process.chdir(originalCwd);
       delete process.env.DOCMD_PROJECT_OUT;
       delete process.env.DOCMD_PROJECT_PREFIX;
@@ -286,7 +322,7 @@ export async function buildMultiProject(
   // Final summary
   if (!opts.quiet) {
     const totalSize = await getDirectorySize(rootOutDir);
-    TUI.success(`Multi-project build complete. ${sorted.length} projects → ${path.relative(CWD, rootOutDir)}/ (${formatBytes(totalSize)}) in ${totalElapsed()}.`);
+    TUI.success(`Multi-project build complete. ${sorted.length} projects → ${path.relative(CWD, rootOutDir)}/ (${formatBytes(totalSize)}) in ${totalElapsed()}.\n`);
   }
 }
 
@@ -410,8 +446,8 @@ export async function devMultiProject(
     TUI.item('', '', TUI.dim, TUI.green);
 
     for (const project of multiConfig.projects) {
-      const prefix = project.prefix === '/' ? '/' : project.prefix;
-      TUI.item('Project', localUrl + prefix, TUI.dim, TUI.green);
+      const pfx = project.prefix === '/' ? '/' : project.prefix;
+      TUI.item('Project', localUrl + pfx, TUI.dim, TUI.green);
     }
     TUI.item('', '', TUI.dim, TUI.green);
     TUI.footer(TUI.green);
@@ -438,20 +474,25 @@ export async function devMultiProject(
         if (isRebuilding) return;
         isRebuilding = true;
 
+        const isConfigUpdate = filename.includes('docmd.config') && !filename.includes('docmd.config-');
         const label = project.prefix === '/' ? '/' : project.prefix;
         const displayPath = filename.replace(/^[^/]+\//, '');
         const rebuildElapsed = TUI.timer();
 
-        TUI.step(`Rebuilding [${label}] ${displayPath}`, 'WAIT', TUI.blue, true);
+        if (isConfigUpdate) {
+          TUI.step(`Reloading config and rebuilding [${label}]`, 'WAIT', TUI.blue, true);
+        } else {
+          TUI.step(`Rebuilding [${label}] ${displayPath}`, 'WAIT', TUI.blue, true);
+        }
 
         try {
           const fullChangedPath = path.resolve(projectSrcDir, filename);
           await buildSingleProject(project, multiConfig, { 
             isDev: true,
-            targetFiles: [fullChangedPath]
+            targetFiles: isConfigUpdate ? undefined : [fullChangedPath]
           });
           broadcastReload();
-          TUI.step(`Rebuilt [${label}] ${displayPath} in ${rebuildElapsed()}`, 'DONE', TUI.blue, true);
+          TUI.step(`Rebuilt [${label}] ${isConfigUpdate ? 'with new config' : displayPath} in ${rebuildElapsed()}`, 'DONE', TUI.blue, true);
         } catch (err: any) {
           TUI.step(`Rebuild [${label}] ${displayPath}`, 'FAIL', TUI.blue, true);
           TUI.error('Rebuild failed', err.message);
@@ -459,6 +500,42 @@ export async function devMultiProject(
           isRebuilding = false;
         }
       }, 200);
+    });
+  }
+
+  // Watch the root multi-project config file itself
+  if (multiConfig._resolvedPath && nativeFs.existsSync(multiConfig._resolvedPath)) {
+    let rootConfigLock = false;
+    nativeFs.watch(multiConfig._resolvedPath, () => {
+      if (rootConfigLock) return;
+      rootConfigLock = true;
+
+      if (rebuildTimeout) clearTimeout(rebuildTimeout);
+      rebuildTimeout = setTimeout(async () => {
+        if (isRebuilding) return;
+        isRebuilding = true;
+
+        const rebuildElapsed = TUI.timer();
+        TUI.step('Reloading multi-project workspace config...', 'WAIT', TUI.blue, true);
+
+        try {
+          const { detectMultiProject } = await import('./projects.js');
+          const newMultiConfig = await detectMultiProject(path.basename(multiConfig._resolvedPath));
+          if (newMultiConfig) {
+            // Update the reference for subsequent project rebuilds
+            Object.assign(multiConfig, newMultiConfig);
+            await buildMultiProject(newMultiConfig, { isDev: true });
+            broadcastReload();
+            TUI.step(`Rebuilt entire workspace with new config in ${rebuildElapsed()}`, 'DONE', TUI.blue, true);
+          }
+        } catch (err: any) {
+          TUI.step('Workspace Rebuild', 'FAIL', TUI.blue, true);
+          TUI.error('Rebuild failed', err.message);
+        } finally {
+          isRebuilding = false;
+          setTimeout(() => { rootConfigLock = false; }, 500);
+        }
+      }, 300);
     });
   }
 
@@ -505,7 +582,7 @@ export async function devMultiProject(
 
     if (process.stdin.isTTY) process.stdin.setRawMode(false);
 
-    TUI.success('Shutting down...');
+    TUI.success('Shutting down...\n');
 
     server.close();
     if (wss) wss.close();

@@ -14,7 +14,7 @@
 
 import path from 'path';
 import { fileURLToPath } from 'url';
-import fs from '../utils/fs-utils.js';
+import { fsUtils as fs, WorkerPool } from '@docmd/utils';
 import { loadConfig } from '../utils/config-loader.js';
 import { TUI, loadPlugins } from '@docmd/api';
 
@@ -54,6 +54,12 @@ export async function buildSite(configPath: string, opts: any = {}) {
   // 1. Load Config (Zero-Config aware)
   try {
     const config = await loadConfig(configPath, { isDev: options.isDev });
+    
+    // Initialize global WorkerPool (or use provided one)
+    const workerScript = path.resolve(__dirname, '../engine/worker-parser.js');
+    const workerPool = opts.workerPool || new WorkerPool(workerScript, { config, cwd: process.cwd() });
+    config._workerPool = workerPool;
+
     const hooks = await loadPlugins(config, { resolvePaths: [__dirname] });
 
     // Execute onConfigResolved hooks
@@ -62,6 +68,7 @@ export async function buildSite(configPath: string, opts: any = {}) {
     }
 
     const buildHash = Date.now().toString(36);
+    const _buildId   = `${buildHash}-${Math.random().toString(36).slice(2,7)}`;
 
     // Use V3 labels (config.out / config.src) which are normalized by config-schema
     const rootOutputDir = path.resolve(CWD, config.out);
@@ -70,20 +77,9 @@ export async function buildSite(configPath: string, opts: any = {}) {
     // ── TUI: Build section header ──────────────────────────
     if (!options.quiet) {
       TUI.section('Build');
-      TUI.item('Source', config.src + '/', TUI.dim, TUI.cyan);
-      TUI.item('Output', path.relative(CWD, rootOutputDir) + '/', TUI.dim, TUI.cyan);
-    }
-
-    // Show stats (versions/locales) when not quiet OR when explicitly requested
-    if (!options.quiet || options.showStats) {
-      if (config.versions?.all?.length > 0) {
-        const vLabels = config.versions.all.map((v: any) => v.id).join(', ');
-        TUI.item('Versions', `${config.versions.all.length} (${vLabels})`, TUI.dim, TUI.cyan);
-      }
-      if (config.i18n?.locales?.length > 0) {
-        const lLabels = config.i18n.locales.map((l: any) => l.id).join(', ');
-        TUI.item('Locales', `${config.i18n.locales.length} (${lLabels})`, TUI.dim, TUI.cyan);
-      }
+      const details = TUI.extractProjectDetails(config, rootOutputDir, CWD);
+      TUI.projectDetails(details);
+      TUI.footer(); // close Build — Data Indexing and progress appear in clean air
     }
 
     // Helper: Build Assets for a specific output directory
@@ -110,42 +106,24 @@ export async function buildSite(configPath: string, opts: any = {}) {
       await buildAssetsForDir(rootOutputDir);
     }
 
-    // Pre-count all pages across all locales and versions.
-    // This gives us the exact total BEFORE processing starts, so the
-    // progress bar can show accurate 0 → N from the very first page.
-    const expectedTotal = await preCountPages(config, CWD, options.targetFiles);
-    const processedSoFar = 0;
-
-    const displayProgress = options.onProgress || (!options.quiet ? (current: number, total: number) => {
-      TUI.progress('Processing     ', current, total);
-    } : undefined);
-
-    // Each renderPages call reports (current, total) for its own pass.
-    // We ignore its `total` and use our pre-counted expectedTotal instead.
-    // Track pass transitions by watching when the per-pass total changes
-    // OR when current resets (drops below last value = new pass started).
-    let processedBeforeThisPass = 0;
-    let currentPassTotal = -1;
-    let lastCurrent = 0;
-    const fixedTotalProgress = displayProgress ? (current: number, passTotal: number) => {
-      // Detect new renderPages pass: passTotal changes, or current reset
-      const isNewPass = passTotal !== currentPassTotal || current < lastCurrent;
-      if (isNewPass) {
-        processedBeforeThisPass += currentPassTotal > 0 ? currentPassTotal : 0;
-        currentPassTotal = passTotal;
-      }
-      lastCurrent = current;
-      displayProgress(processedBeforeThisPass + current, expectedTotal);
-    } : undefined;
+    // Open Data Indexing before buildLocales so git (onBeforeBuild) runs inside it.
+    // Search (indexing phase below) is appended to the same open section.
+    const INDEXING_PLUGINS = new Set(['search']);
+    const indexingHooks   = hooks.onPostBuild.filter((fn: any) => INDEXING_PLUGINS.has(fn._pluginName));
+    const publishingHooks = hooks.onPostBuild.filter((fn: any) => !INDEXING_PLUGINS.has(fn._pluginName));
+    const hasIndexingWork = !options.targetFiles && (
+      (hooks.onBeforeBuild?.length ?? 0) > 0 || indexingHooks.length > 0
+    );
+    if (hasIndexingWork) TUI.section('Data Indexing', TUI.blue);
 
     const allGeneratedPages = await buildLocales({
       config,
       rootOutputDir,
       hooks,
       buildHash,
-      options,
+      options: { ...options, _buildId } as any,
       CWD,
-      onProgress: fixedTotalProgress,
+      onProgress: options.onProgress,
       targetFiles: options.targetFiles
     });
 
@@ -245,24 +223,44 @@ export async function buildSite(configPath: string, opts: any = {}) {
       }
     }
 
-    // --- 5. Post Build Hooks (Search, Sitemap, LLMs) ---
-    // Only run on full builds to prevent partial data from corrupting global indexes
+    // --- 5. Post Build Hooks ---
+    // Only run on full builds. Split into:
+    //   Data Indexing → search (appended to already-open section from git above)
+    //   Publishing    → sitemap, llms, pwa, etc.
     if (!options.targetFiles) {
-      if (!options.quiet) {
-        TUI.footer(TUI.cyan);
-        TUI.section('Post-Build Tasks', TUI.blue);
-      }
-      await Promise.all(hooks.onPostBuild.map((fn: any) => fn({
+      const postBuildCtx = {
         config,
-        pages: allGeneratedPages,
+        pages:     allGeneratedPages,
         outputDir: rootOutputDir,
-        log: (msg: string) => !options.quiet && TUI.step(msg, 'DONE', TUI.blue)
-      })));
+        log: (msg: string, status: 'DONE'|'SKIP'|'FAIL'|'WAIT' = 'DONE') => {
+          TUI.step(msg, status, TUI.blue);
+        },
+        tui:     TUI,
+        options: { ...options, quiet: false },
+        runWorkerTask(modulePath: string, functionName: string, args: any[]) {
+          if (!config._workerPool) throw new Error('WorkerPool is not initialized');
+          return config._workerPool.runTask({ type: 'plugin-task', modulePath, functionName, args });
+        }
+      };
+
+      // Indexing — search runs in the already-open Data Indexing section
+      for (const fn of indexingHooks) await fn(postBuildCtx);
+      if (hasIndexingWork) TUI.footer(TUI.blue);
+
+      // Publishing — sitemap, llms, pwa, etc.
+      if (publishingHooks.length > 0) {
+        TUI.section('Publishing', TUI.blue);
+        for (const fn of publishingHooks) await fn(postBuildCtx);
+        TUI.footer(TUI.blue);
+      }
     }
 
-    if (!options.isDev && !options.quiet) {
-      TUI.footer(TUI.blue);
+    if (!options.isDev) {
       TUI.success(`Build complete. Generated ${allGeneratedPages.length} pages in ${elapsed()}.`);
+    }
+
+    if (!opts.workerPool) {
+      await workerPool.terminateAll();
     }
 
   } catch (e: any) {

@@ -14,7 +14,7 @@
 
 import path from 'path';
 import nodeFs from 'fs';
-import fs from '../utils/fs-utils.js';
+import { fsUtils as fs } from '@docmd/utils';
 import { TUI } from '@docmd/tui';
 import { renderPages } from './generator.js';
 import { resolveLocaleSrcDir, resolveFallbackSrcDir } from './i18n.js';
@@ -60,9 +60,21 @@ export function filterNavForVersion(items: any[], vSrcDir: string, fallbackSrcDi
       let relativeFilePath = newItem.path.replace(/^\//, '');
       // Reverse clean-URL normalisation to find the source file
       if (relativeFilePath.endsWith('/') || relativeFilePath === '') {
-        // Trailing slash (or root) → could be folder/index.md
+        // Trailing slash (or root) → could be folder/index.md or folder/README.md or file.md
         const dir = relativeFilePath.replace(/\/$/, '');
-        relativeFilePath = dir ? dir + '/index.md' : 'index.md';
+        const fileCandidate = dir ? dir + '.md' : '';
+        const indexCandidates = dir 
+          ? [dir + '/index.md', dir + '/README.md', dir + '/readme.md', fileCandidate]
+          : ['index.md', 'README.md', 'readme.md'];
+        
+        const found = indexCandidates.find(c => {
+          if (!c) return false;
+          const abs = path.join(vSrcDir, c);
+          if (nodeFs.existsSync(abs)) return true;
+          if (fallbackSrcDir && nodeFs.existsSync(path.join(fallbackSrcDir, c))) return true;
+          return false;
+        });
+        relativeFilePath = found || (dir ? dir + '/index.md' : 'index.md');
       } else if (!relativeFilePath.endsWith('.md')) {
         relativeFilePath += '.md';
       }
