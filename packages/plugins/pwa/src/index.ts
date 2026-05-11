@@ -18,7 +18,7 @@ import type { PluginDescriptor } from '@docmd/api';
 
 export const plugin: PluginDescriptor = {
   name: 'pwa',
-  version: '0.7.9',
+  version: '0.8.0',
   capabilities: ['post-build']
 };
 

@@ -293,7 +293,7 @@ export async function buildMultiProject(
   // Final summary
   if (!opts.quiet) {
     const totalSize = await getDirectorySize(rootOutDir);
-    TUI.success(`Multi-project build complete. ${sorted.length} projects → ${path.relative(CWD, rootOutDir)}/ (${formatBytes(totalSize)}) in ${totalElapsed()}.`);
+    TUI.success(`Multi-project build complete. ${sorted.length} projects → ${path.relative(CWD, rootOutDir)}/ (${formatBytes(totalSize)}) in ${totalElapsed()}.\n`);
   }
 }
 
@@ -512,7 +512,7 @@ export async function devMultiProject(
 
     if (process.stdin.isTTY) process.stdin.setRawMode(false);
 
-    TUI.success('Shutting down...');
+    TUI.success('Shutting down...\n');
 
     server.close();
     if (wss) wss.close();

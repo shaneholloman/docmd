@@ -106,7 +106,7 @@ export async function startDevServer(configPathOption: string, opts: any = {}) {
     const workerScript = path.resolve(__dirname, '../engine/worker-parser.js');
     workerPool = new WorkerPool(workerScript, { config, cwd: CWD });
     await buildSite(configPathOption, { isDev: true, preserve: options.preserve, quiet: true, showStats: false, workerPool });
-    TUI.info(`Initial build completed in ${initialElapsed()}.\n`);
+    TUI.info(`Initial build completed in ${initialElapsed()}.`);
   } catch (error: any) {
     TUI.error('Initial build failed', error.message);
   }
@@ -363,7 +363,7 @@ export async function startDevServer(configPathOption: string, opts: any = {}) {
 
     if (process.stdin.isTTY) process.stdin.setRawMode(false);
 
-    TUI.success('Shutting down...');
+    TUI.success('Shutting down...\n');
 
     // Force exit after a shorter timeout if graceful shutdown hangs
     const forceExitTimeout = setTimeout(() => {
