@@ -1,0 +1,31 @@
+{
+  "name": "@docmd/engine-rust",
+  "version": "0.8.1",
+  "description": "Rust-accelerated engine for docmd. Downloads pre-built binary at install time.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "postinstall": "node scripts/postinstall.cjs"
+  },
+  "files": [
+    "dist",
+    "scripts",
+    "bin"
+  ],
+  "keywords": ["docmd", "engine", "rust", "native", "performance"],
+  "author": { "name": "Ghazi", "url": "https://mgks.dev" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/docmd-io/docmd.git",
+    "directory": "packages/engines/rust"
+  },
+  "license": "MIT"
+}

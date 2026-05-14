@@ -1,6 +1,6 @@
 {
   "name": "@docmd/monorepo",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "private": true,
   "description": "The minimalist, zero-config documentation generator monorepo.",
   "scripts": {
@@ -12,7 +12,7 @@
     "lint": "eslint .",
     "bump": "node scripts/bump.js",
     "stop": "node packages/core/dist/bin/docmd.js stop >/dev/null 2>&1 || true",
-    "clean": "rm -rf node_modules packages/*/node_modules packages/plugins/*/node_modules packages/*/dist packages/plugins/*/dist packages/*/public packages/plugins/*/public packages/*/site packages/plugins/*/site *.tsbuildinfo temp-* >/dev/null 2>&1;",
+    "clean": "rm -rf node_modules packages/*/node_modules packages/plugins/*/node_modules packages/engines/*/node_modules packages/*/dist packages/plugins/*/dist packages/engines/*/dist packages/engines/rust/native/bin/*.node packages/*/public packages/plugins/*/public packages/*/site packages/plugins/*/site *.tsbuildinfo temp-* >/dev/null 2>&1;",
     "unlink": "npm uninstall -g @docmd/core @docmd/monorepo docmd docmd-live -s >/dev/null 2>&1 || true; pnpm uninstall -g @docmd/core @docmd/monorepo docmd docmd-live -s >/dev/null 2>&1 || true; rm -f $(which -a docmd 2>/dev/null) $(which -a docmd-live 2>/dev/null) >/dev/null 2>&1 || true;",
     "reset": "node scripts/status.js start:reset && pnpm -s stop && pnpm -s unlink && pnpm -s clean && node scripts/status.js reset"
   },
