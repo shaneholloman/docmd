@@ -14,6 +14,7 @@
 
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import crypto from 'crypto';
@@ -100,19 +101,34 @@ let _gitIndexingDone = false;
  * This fixes multi-project builds where process.chdir() shifts per-project,
  * which caused the cache to land in unpredictable subdirectories.
  */
+let _configuredTmpDir: string | null = null;
+
+/**
+ * Resolve the cache directory base path.
+ * If config.tmp is configured, stores temporary files inside that specified path.
+ * Otherwise, moves them to the device's actual OS temporary folder nested by project hash
+ * so multiple documentations on the same device remain perfectly isolated.
+ */
 function resolveCacheDir(): string {
-  // Walk up from cwd to find the git root, so cache is stable across chdir calls
+  if (_configuredTmpDir) {
+    return path.join(path.resolve(process.cwd(), _configuredTmpDir), 'cache');
+  }
+
+  // Walk up from cwd to find the project git root, ensuring stable path resolution
   let dir = process.cwd();
   for (let i = 0; i < 10; i++) {
     if (fs.existsSync(path.join(dir, '.git'))) {
-      return path.join(dir, '.docmd', 'cache');
+      break;
     }
     const parent = path.dirname(dir);
-    if (parent === dir) break; // reached filesystem root
+    if (parent === dir) break;
     dir = parent;
   }
-  // Fallback: use cwd-relative
-  return path.join(process.cwd(), '.docmd', 'cache');
+
+  // Generate a unique hash for this project workspace to isolate multi-project temp storage
+  const hash = crypto.createHash('md5').update(dir).digest('hex').slice(0, 12);
+  const baseSlug = path.basename(dir).replace(/[^a-zA-Z0-9-_]/g, '');
+  return path.join(os.tmpdir(), `docmd-${baseSlug}-${hash}`, 'cache');
 }
 
 function initDiskCache() {
@@ -345,6 +361,7 @@ export function onConfigResolved(config: any): void {
   _diskCachePath = null;
   _cacheDirty = false;
   _configuredEngine = config.engine || 'rust'; // Respect the config.engine key
+  _configuredTmpDir = config.tmp || null;      // Respect the config.tmp custom path
   pluginOptions = config.plugins?.git || {};
 }
 
