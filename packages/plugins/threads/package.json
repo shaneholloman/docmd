@@ -1,6 +1,6 @@
 {
   "name": "@docmd/plugin-threads",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "type": "module",
   "description": "Inline discussion threads for docmd.",
   "main": "dist/index.js",
@@ -25,8 +25,8 @@
     "@docmd/parser": "workspace:*"
   },
   "dependencies": {
-    "@awesome.me/webawesome": "^3.6.0",
-    "lit": "^3.3.2"
+    "@awesome.me/webawesome": "^3.7.0",
+    "lit": "^3.3.3"
   },
   "devDependencies": {
     "@docmd/api": "workspace:*",
