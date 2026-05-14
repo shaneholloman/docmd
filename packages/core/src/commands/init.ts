@@ -45,7 +45,7 @@ const defaultConfigContent = `{
     },
     "footer": {
       "style": "minimal",
-      "content": "© My Project.",
+      "content": "© ${new Date().getFullYear()} My Project.",
       "branding": true
     }
   },
@@ -78,9 +78,6 @@ const defaultConfigContent = `{
     },
     "seo": {
       "defaultDescription": "Documentation built with docmd."
-    },
-    "sitemap": {
-      "defaultChangefreq": "weekly"
     }
   }
 }
@@ -100,8 +97,8 @@ Congratulations! You have successfully initialised a new **docmd** project.
 You are currently viewing \`docs/index.md\`.
 
 \`\`\`bash
-npm run dev   # Start the dev server
-npm run build # Build for production
+npx @docmd/core dev   # Start the dev server
+npx @docmd/core build # Build for production
 \`\`\`
 
 ## Features Demo
@@ -135,6 +132,7 @@ print('Hello World')
 - **SEO Optimisation**
 - **Git Integration**
 - **Mermaid Diagrams**
+- **LLMs Context**
 
 ## Next Steps
 - **[Official Documentation](https://docs.docmd.io)**
