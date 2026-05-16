@@ -13,16 +13,18 @@
  */
 
 /**
- * Multi-Project Handler.
+ * Workspace Handler.
  *
  * Enables a single docmd instance to build multiple independent
  * documentation projects under one domain.
  *
  * Root config:
- *   projects: [
- *     { prefix: '/',       src: 'docmd-main' },
- *     { prefix: '/search', src: 'docmd-search' }
- *   ]
+ *   workspace: {
+ *     projects: [
+ *       { prefix: '/',       src: 'docmd-main' },
+ *       { prefix: '/search', src: 'docmd-search' }
+ *     ]
+ *   }
  *
  * Each project folder has its own docmd.config.js with its own
  * title, versions, i18n, plugins, navigation, etc.
@@ -50,36 +52,62 @@ export interface ProjectEntry {
   prefix: string;
   /** Source directory relative to CWD (contains the project's docmd.config.js). */
   src: string;
+  /** Optional: Display title for the project switcher. */
+  title?: string;
 }
 
-export interface MultiProjectConfig {
+export interface WorkspaceConfig {
+  /** The list of projects in the workspace. */
   projects: ProjectEntry[];
+  /** Project switcher configuration. */
+  switcher?: {
+    enabled?: boolean;
+    position?: 'sidebar-top' | 'sidebar-bottom' | 'options-menu';
+  };
+}
+
+export interface WorkspaceRootConfig {
+  /** The workspace configuration. */
+  workspace?: WorkspaceConfig;
+  /** Legacy projects array (deprecated, maps to workspace.projects). */
+  projects?: ProjectEntry[];
   /** Shared output directory. Default: 'site' */
   out?: string;
   /** Internal: Absolute path to the config file itself. Used for hot-reloading. */
   _resolvedPath?: string;
+  /** Internal: Any other root keys act as global defaults. */
+  [key: string]: any;
 }
 
 /* ── Detection ─────────────────────────────────────────────── */
 
 /**
- * Check if a raw config object is a multi-project config.
- * A multi-project config has a `projects` array at root level.
+ * Check if a raw config object is a workspace config.
  */
-export function isMultiProject(rawConfig: any): rawConfig is MultiProjectConfig {
-  return rawConfig
-    && Array.isArray(rawConfig.projects)
-    && rawConfig.projects.length > 0
-    && rawConfig.projects.every((p: any) =>
+export function isWorkspace(rawConfig: any): rawConfig is WorkspaceRootConfig {
+  if (!rawConfig) return false;
+
+  // New 'workspace' schema
+  if (rawConfig.workspace && Array.isArray(rawConfig.workspace.projects)) {
+    return rawConfig.workspace.projects.every((p: any) =>
       typeof p.prefix === 'string' && typeof p.src === 'string'
     );
+  }
+
+  // Legacy 'projects' schema (for backward compatibility)
+  if (Array.isArray(rawConfig.projects) && rawConfig.projects.length > 0) {
+    return rawConfig.projects.every((p: any) =>
+      typeof p.prefix === 'string' && typeof p.src === 'string'
+    );
+  }
+
+  return false;
 }
 
 /**
- * Load the raw config file without normalization to check for projects.
- * Returns null if no config found or if it's not multi-project.
+ * Load the raw config file without normalization to check for workspace settings.
  */
-export async function detectMultiProject(configPathOption: string): Promise<MultiProjectConfig | null> {
+export async function detectWorkspace(configPathOption: string): Promise<WorkspaceRootConfig | null> {
   const CWD = process.cwd();
   let absolutePath = path.resolve(CWD, configPathOption);
 
@@ -128,9 +156,25 @@ export async function detectMultiProject(configPathOption: string): Promise<Mult
       delete (global as any).defineConfig;
     }
 
-    if (isMultiProject(rawConfig)) {
+    if (isWorkspace(rawConfig)) {
       rawConfig._resolvedPath = absolutePath;
-      return rawConfig as MultiProjectConfig;
+
+      // Internal normalization: map legacy 'projects' to 'workspace.projects'
+      if (!rawConfig.workspace && rawConfig.projects) {
+        rawConfig.workspace = {
+          projects: rawConfig.projects,
+          switcher: { enabled: true, position: 'sidebar-top' }
+        };
+      } else if (rawConfig.workspace) {
+        // Ensure default switcher settings
+        rawConfig.workspace.switcher = {
+          enabled: true,
+          position: 'sidebar-top',
+          ...rawConfig.workspace.switcher
+        };
+      }
+
+      return rawConfig as WorkspaceRootConfig;
     }
     return null;
   } catch {
@@ -164,17 +208,16 @@ function validateProjects(projects: ProjectEntry[]): void {
   }
 
   if (!hasRoot) {
-    throw new Error('Multi-project config must have a root project with prefix "/"');
+    throw new Error('Workspace configuration must have a root project with prefix "/"');
   }
 
-  // Check for potential conflicts: warn if root project might have content at a sub-project's prefix
+  // Check for potential conflicts
   const rootProject = projects.find(p => p.prefix === '/');
   if (rootProject) {
     const rootSrcPath = path.resolve(process.cwd(), rootProject.src);
     for (const project of projects) {
       if (project.prefix === '/') continue;
       const prefixName = project.prefix.replace(/^\//, '');
-      // Check if root project has a folder matching another project's prefix
       const conflictPath = path.join(rootSrcPath, prefixName);
       if (nativeFs.existsSync(conflictPath)) {
         TUI.warn(`Potential conflict: Root project has "${prefixName}/" folder which may conflict with project prefix "${project.prefix}".`);
@@ -187,41 +230,43 @@ function validateProjects(projects: ProjectEntry[]): void {
 /* ── Build ─────────────────────────────────────────────────── */
 
 /**
- * Build all projects in a multi-project config.
- *
- * For each project:
- * 1. cd into the project's src directory
- * 2. Load its own docmd.config.js
- * 3. Override src/out to fit the project structure
- * 4. Build normally
- * 5. Move output into the correct prefix under the root output dir
+ * Build all projects in a workspace.
  */
-export async function buildMultiProject(
-  multiConfig: MultiProjectConfig,
+export async function buildWorkspace(
+  workspaceConfig: WorkspaceRootConfig,
   opts: { isDev?: boolean; offline?: boolean; quiet?: boolean } = {}
 ): Promise<void> {
   const CWD = process.cwd();
-  const rootOutDir = path.resolve(CWD, multiConfig.out || 'site');
+  const rootOutDir = path.resolve(CWD, workspaceConfig.out || 'site');
   const totalElapsed = TUI.timer();
 
-  validateProjects(multiConfig.projects);
+  const workspace = workspaceConfig.workspace!;
+  validateProjects(workspace.projects);
+
+  // Extract global defaults
+  const globalDefaults: Record<string, any> = {};
+  const skipKeys = ['workspace', 'projects', 'out', '_resolvedPath'];
+  for (const key of Object.keys(workspaceConfig)) {
+    if (!skipKeys.includes(key) && !key.startsWith('_')) {
+      globalDefaults[key] = workspaceConfig[key];
+    }
+  }
 
   // Sort: root project first, then alphabetical
-  const sorted = [...multiConfig.projects].sort((a, b) => {
+  const sorted = [...workspace.projects].sort((a, b) => {
     if (a.prefix === '/') return -1;
     if (b.prefix === '/') return 1;
     return a.prefix.localeCompare(b.prefix);
   });
 
-  // Section header — the CLI already printed the docmd banner
   if (!opts.quiet) {
-    TUI.section(`Multi-Project Build (${sorted.length} projects)`);
+    TUI.section(`Workspace Build (${sorted.length} projects)`);
   }
 
   // Ensure clean output directory
   await fs.ensureDir(rootOutDir);
 
-  // Copy shared assets first (root-level assets/ folder)
+  // Copy shared assets first
   const sharedAssetsDir = path.resolve(CWD, 'assets');
   if (nativeFs.existsSync(sharedAssetsDir)) {
     if (!opts.quiet) {
@@ -248,18 +293,15 @@ export async function buildMultiProject(
     const hasProjectConfig = resolvedConfigName !== null;
     const configFileToUse = resolvedConfigName || 'docmd.config.js';
 
-    // Determine this project's output directory
     const projectOutDir = prefix === '/'
       ? rootOutDir
       : path.join(rootOutDir, prefix.replace(/^\//, ''));
 
     const label = prefix === '/' ? `/ (root)` : prefix;
-    const projectElapsed = TUI.timer();
 
     if (!opts.quiet) {
-      TUI.section(`Building: ${label}`);
+      TUI.section(`Building Project: ${label}`);
 
-      // Load the child config to extract version/locale details
       const originalCwdCheck = process.cwd();
       process.chdir(projectSrcDir);
       try {
@@ -273,7 +315,6 @@ export async function buildMultiProject(
           locales: childDetails.locales,
         });
       } catch {
-        // Fallback: just show source/output if config loading fails
         TUI.item('Source', `${project.src}/`, TUI.dim, TUI.cyan);
         TUI.item('Output', `${path.relative(CWD, projectOutDir)}/`, TUI.dim, TUI.cyan);
       } finally {
@@ -285,31 +326,25 @@ export async function buildMultiProject(
       }
     }
 
-    // Change to project directory and build
     const originalCwd = process.cwd();
     process.chdir(projectSrcDir);
 
     try {
-      // The project's config should NOT have src/out,
-      // because the multi-project handler provides those.
-      // We set environment variables so the config loader can
-      // pick them up. src is NOT overridden - the child config
-      // controls where content lives (defaults to 'docs').
       process.env.DOCMD_PROJECT_OUT = projectOutDir;
       process.env.DOCMD_PROJECT_PREFIX = prefix;
 
-      // If shared assets exist, copy them into the project output
       if (nativeFs.existsSync(sharedAssetsDir)) {
         await fs.ensureDir(path.join(projectOutDir, 'assets'));
         await fs.copy(sharedAssetsDir, path.join(projectOutDir, 'assets'));
       }
 
-      // Build this project — quiet suppresses headers/summary,
-      // but showStats + onProgress give us live feedback
       await buildSite(configFileToUse, {
         isDev:   opts.isDev   || false,
         offline: opts.offline || false,
-        quiet:   true,  // Projects.ts owns all section headers
+        quiet:   true,
+        _globalDefaults: globalDefaults,
+        _workspace: workspace,
+        _activePrefix: prefix
       });
 
     } catch (err: any) {
@@ -325,22 +360,22 @@ export async function buildMultiProject(
     }
   }
 
-  // Final summary
   if (!opts.quiet) {
     const totalSize = await getDirectorySize(rootOutDir);
-    TUI.success(`Multi-project build complete. ${sorted.length} projects → ${path.relative(CWD, rootOutDir)}/ (${formatBytes(totalSize)}) in ${totalElapsed()}.\n`);
+    TUI.success(`Workspace build complete. ${sorted.length} projects → ${path.relative(CWD, rootOutDir)}/ (${formatBytes(totalSize)}) in ${totalElapsed()}.\n`);
   }
 }
 
-/* ── Single Project Build (for dev watchers) ────────────────── */
+/* ── Single Project Build ────────────────── */
 
-async function buildSingleProject(
+async function buildWorkspaceProject(
   project: ProjectEntry,
-  multiConfig: MultiProjectConfig,
+  workspaceConfig: WorkspaceRootConfig,
   opts: { isDev?: boolean; offline?: boolean; quiet?: boolean; targetFiles?: string[] } = {}
 ): Promise<void> {
   const CWD = process.cwd();
-  const rootOutDir = path.resolve(CWD, multiConfig.out || 'site');
+  const rootOutDir = path.resolve(CWD, workspaceConfig.out || 'site');
+  const workspace = workspaceConfig.workspace!;
   const prefix = project.prefix === '/' ? '/' : project.prefix.replace(/\/$/, '');
   const projectSrcDir = path.resolve(CWD, project.src);
 
@@ -360,7 +395,6 @@ async function buildSingleProject(
 
   const label = prefix === '/' ? '/ (root)' : prefix;
 
-  // Change to project directory and build
   const originalCwd = process.cwd();
   process.chdir(projectSrcDir);
 
@@ -368,19 +402,28 @@ async function buildSingleProject(
     process.env.DOCMD_PROJECT_OUT = projectOutDir;
     process.env.DOCMD_PROJECT_PREFIX = prefix;
 
-    // Copy shared assets if they exist
     const sharedAssetsDir = path.resolve(CWD, 'assets');
     if (nativeFs.existsSync(sharedAssetsDir)) {
       await fs.ensureDir(path.join(projectOutDir, 'assets'));
       await fs.copy(sharedAssetsDir, path.join(projectOutDir, 'assets'));
     }
 
-    // Build only this project
+    const globalDefaults: Record<string, any> = {};
+    const skipKeys = ['workspace', 'projects', 'out', '_resolvedPath'];
+    for (const key of Object.keys(workspaceConfig)) {
+      if (!skipKeys.includes(key) && !key.startsWith('_')) {
+        globalDefaults[key] = workspaceConfig[key];
+      }
+    }
+
     await buildSite(configFileToUse, {
       isDev: opts.isDev || false,
       offline: opts.offline || false,
-      quiet: true, // Suppress output in dev mode
-      targetFiles: opts.targetFiles
+      quiet: true,
+      targetFiles: opts.targetFiles,
+      _globalDefaults: globalDefaults,
+      _workspace: workspace,
+      _activePrefix: prefix
     });
 
   } catch (err: any) {
@@ -396,29 +439,21 @@ async function buildSingleProject(
 /* ── Dev Server Wrapper ────────────────────────────────────── */
 
 /**
- * Start dev server for multi-project mode.
- *
- * Builds all projects initially, then watches each project's
- * source directory for changes and rebuilds only the affected project.
+ * Start dev server for workspace mode.
  */
-export async function devMultiProject(
-  multiConfig: MultiProjectConfig,
+export async function devWorkspace(
+  workspaceConfig: WorkspaceRootConfig,
   opts: { port?: string; preserve?: boolean } = {}
 ): Promise<void> {
-  // For dev mode, do a full multi-project build first.
-  // isDev: true affects build behaviour (no minification etc),
-  // quiet is NOT set so we get full TUI output (sections, stats, progress).
   try {
-    await buildMultiProject(multiConfig, { isDev: true });
+    await buildWorkspace(workspaceConfig, { isDev: true });
   } catch (err: any) {
     TUI.error('Initial build failed', err.message);
   }
 
-  // Then start a simple static server on the combined output
   const CWD = process.cwd();
-  const rootOutDir = path.resolve(CWD, multiConfig.out || 'site');
+  const rootOutDir = path.resolve(CWD, workspaceConfig.out || 'site');
 
-  // Import dev utilities
   const { serveStatic, findAvailablePort, formatPathForDisplay, getNetworkIp } = await import('../utils/dev-utils.js');
   const http = await import('http');
   const { WebSocketServer, WebSocket } = await import('ws');
@@ -447,7 +482,7 @@ export async function devMultiProject(
     const localUrl = `http://127.0.0.1:${port}`;
     const networkUrl = networkIp ? `http://${networkIp}:${port}` : null;
 
-    TUI.section('Development Server Running', TUI.green);
+    TUI.section('Workspace Dev Server Running', TUI.green);
     TUI.item('', '', TUI.dim, TUI.green);
     TUI.item('Local Access', localUrl, TUI.bold, TUI.green);
     if (networkUrl) {
@@ -456,7 +491,8 @@ export async function devMultiProject(
     TUI.item('Serving from', formatPathForDisplay(rootOutDir, CWD), TUI.dim, TUI.green);
     TUI.item('', '', TUI.dim, TUI.green);
 
-    for (const project of multiConfig.projects) {
+    const workspace = workspaceConfig.workspace!;
+    for (const project of workspace.projects) {
       const pfx = project.prefix === '/' ? '/' : project.prefix;
       TUI.item('Project', localUrl + pfx, TUI.dim, TUI.green);
     }
@@ -464,18 +500,17 @@ export async function devMultiProject(
     TUI.footer(TUI.green);
   });
 
-  // Watch each project's source directory for changes
   let isRebuilding = false;
   let rebuildTimeout: any = null;
 
-  for (const project of multiConfig.projects) {
+  const workspace = workspaceConfig.workspace!;
+  for (const project of workspace.projects) {
     const projectSrcDir = path.resolve(CWD, project.src);
 
     if (!nativeFs.existsSync(projectSrcDir)) continue;
 
     nativeFs.watch(projectSrcDir, { recursive: true }, (event, filename) => {
       if (!filename) return;
-      // Ignore config temp files, node_modules, .git, etc.
       if (filename.includes('.git') || filename.includes('node_modules') ||
           filename.includes('.DS_Store') || filename.startsWith('.') ||
           filename.includes('docmd.config-') || filename.endsWith('.js.bak')) return;
@@ -498,7 +533,7 @@ export async function devMultiProject(
 
         try {
           const fullChangedPath = path.resolve(projectSrcDir, filename);
-          await buildSingleProject(project, multiConfig, { 
+          await buildWorkspaceProject(project, workspaceConfig, { 
             isDev: true,
             targetFiles: isConfigUpdate ? undefined : [fullChangedPath]
           });
@@ -514,10 +549,9 @@ export async function devMultiProject(
     });
   }
 
-  // Watch the root multi-project config file itself
-  if (multiConfig._resolvedPath && nativeFs.existsSync(multiConfig._resolvedPath)) {
+  if (workspaceConfig._resolvedPath && nativeFs.existsSync(workspaceConfig._resolvedPath)) {
     let rootConfigLock = false;
-    nativeFs.watch(multiConfig._resolvedPath, () => {
+    nativeFs.watch(workspaceConfig._resolvedPath, () => {
       if (rootConfigLock) return;
       rootConfigLock = true;
 
@@ -527,15 +561,14 @@ export async function devMultiProject(
         isRebuilding = true;
 
         const rebuildElapsed = TUI.timer();
-        TUI.step('Reloading multi-project workspace config...', 'WAIT', TUI.blue, true);
+        TUI.step('Reloading workspace config...', 'WAIT', TUI.blue, true);
 
         try {
-          const { detectMultiProject } = await import('./projects.js');
-          const newMultiConfig = await detectMultiProject(path.basename(multiConfig._resolvedPath));
-          if (newMultiConfig) {
-            // Update the reference for subsequent project rebuilds
-            Object.assign(multiConfig, newMultiConfig);
-            await buildMultiProject(newMultiConfig, { isDev: true });
+          const { detectWorkspace } = await import('./workspace.js');
+          const newWorkspaceConfig = await detectWorkspace(path.basename(workspaceConfig._resolvedPath!));
+          if (newWorkspaceConfig) {
+            Object.assign(workspaceConfig, newWorkspaceConfig);
+            await buildWorkspace(newWorkspaceConfig, { isDev: true, quiet: true });
             broadcastReload();
             TUI.step(`Rebuilt entire workspace with new config in ${rebuildElapsed()}`, 'DONE', TUI.blue, true);
           }
@@ -550,7 +583,6 @@ export async function devMultiProject(
     });
   }
 
-  // Also watch shared assets
   if (nativeFs.existsSync(path.resolve(CWD, 'assets'))) {
     nativeFs.watch(path.resolve(CWD, 'assets'), { recursive: true }, () => {
       if (rebuildTimeout) clearTimeout(rebuildTimeout);
@@ -562,7 +594,7 @@ export async function devMultiProject(
         TUI.step('Shared assets changed — rebuilding all', 'WAIT', TUI.blue, true);
 
         try {
-          await buildMultiProject(multiConfig, { isDev: true, quiet: true });
+          await buildWorkspace(workspaceConfig, { isDev: true, quiet: true });
           broadcastReload();
           TUI.step(`All projects rebuilt in ${rebuildElapsed()}`, 'DONE', TUI.blue, true);
         } catch (err: any) {
@@ -575,7 +607,6 @@ export async function devMultiProject(
     });
   }
 
-  // Graceful shutdown - suppress ^C display
   if (process.stdin.isTTY) {
     process.stdin.setRawMode(true);
     process.stdin.resume();
@@ -590,11 +621,8 @@ export async function devMultiProject(
   process.on('SIGINT', () => {
     if (isShuttingDown) return;
     isShuttingDown = true;
-
     if (process.stdin.isTTY) process.stdin.setRawMode(false);
-
-    TUI.success('Shutting down...\n');
-
+    TUI.success('Shutting down workspace dev server...\n');
     server.close();
     if (wss) wss.close();
     process.exit(0);

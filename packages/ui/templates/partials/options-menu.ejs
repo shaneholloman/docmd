@@ -21,6 +21,12 @@
     </div>
     <% } %>
 
+    <% if (locals.workspace && workspace.switcher && workspace.switcher.position === 'options-menu') { %>
+    <div class="options-menu-project-switcher">
+        <%- await include('project-switcher', { workspace, config, renderIcon, compact: true }) %>
+    </div>
+    <% } %>
+
     <% if (optionsMenu.components.themeSwitch !== false) { %>
     <button class="theme-toggle-button" aria-label="<%= typeof t === 'function' ? t('toggleTheme') : 'Toggle theme' %>">
         <%- renderIcon('sun', { class: 'icon-sun' }) %> <%- renderIcon('moon', { class: 'icon-moon' }) %>

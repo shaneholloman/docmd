@@ -35,7 +35,7 @@ function hasMarkdownFiles(dir: string, maxDepth = 2, currentDepth = 0): boolean 
   return false;
 }
 
-async function buildZeroConfig(cwd: string, isDev = false, quiet = false) {
+async function buildZeroConfig(cwd: string, isDev = false, quiet = false, options: any = {}) {
 
   if (isDev && !quiet) {
     if (!(global as any).__DOCMD_ZERO_LOGGED) {
@@ -102,7 +102,10 @@ async function buildZeroConfig(cwd: string, isDev = false, quiet = false) {
     theme: { name: 'default', appearance: 'system' }
   };
 
-  return normalizeConfig(autoConfig);
+  // Merge with global defaults
+  const merged = { ...(options._globalDefaults || {}), ...autoConfig };
+
+  return normalizeConfig(merged);
 }
 
 export async function loadConfig(configPath: string, options: any = {}) {
@@ -134,7 +137,7 @@ export async function loadConfig(configPath: string, options: any = {}) {
         TUI.warn('No config found. Running in auto mode. Run `docmd init` to create one.');
         (global as any).__DOCMD_NO_CONFIG_LOGGED = true;
       }
-      const autoConfig = await buildZeroConfig(cwd, options.isDev, options.quiet);
+      const autoConfig = await buildZeroConfig(cwd, options.isDev, options.quiet, options);
       return JSON.parse(JSON.stringify(autoConfig));
     }
   } else if (!fs.existsSync(absoluteConfigPath)) {
@@ -212,20 +215,39 @@ export async function loadConfig(configPath: string, options: any = {}) {
 
       validateConfig(rawConfig);
       const hasExplicitNav = 'navigation' in rawConfig;
-      const normalized = normalizeConfig(rawConfig);
 
-      // Ensure we have a navigation array, fallback to Auto-Router if empty (unless explicitly set to empty)
-      if (!normalized.navigation || (normalized.navigation.length === 0 && !hasExplicitNav)) {
-        // When i18n or versioning is enabled, check if navigation.json exists
-        // in locale/version dirs before warning - it will be loaded later per-locale/version
-        let navScanDir = path.resolve(cwd, normalized.srcDir);
+      // Merge with global defaults: root project config overrides global defaults
+      const mergedConfig = { ...(options._globalDefaults || {}), ...rawConfig };
+
+      const normalized = normalizeConfig(mergedConfig);
+
+      // Navigation Handling: Prioritize local navigation.json in the project folder
+      let navScanDir = path.resolve(cwd, normalized.srcDir);
+      let localNavPath = path.join(navScanDir, 'navigation.json');
+
+      // Adjust navScanDir if i18n is enabled to check in the default locale folder
+      if (normalized.i18n?.default) {
+        const localeScanDir = path.join(navScanDir, normalized.i18n.default);
+        if (fs.existsSync(localeScanDir)) {
+          navScanDir = localeScanDir;
+          localNavPath = path.join(navScanDir, 'navigation.json');
+        }
+      }
+
+      // If navigation.json exists locally, it ALWAYS wins over inherited global navigation
+      if (fs.existsSync(localNavPath)) {
+        try {
+          normalized.navigation = JSON.parse(fs.readFileSync(localNavPath, 'utf-8'));
+        } catch (e: any) {
+          TUI.error('Navigation Error', `Failed to parse ${localNavPath}: ${e.message}`);
+        }
+      } 
+      // Otherwise, if we still don't have any navigation (not from global, not from config, not from JSON), 
+      // check for localized/versioned nav or fallback to auto-nav
+      else if (!normalized.navigation || (normalized.navigation.length === 0 && !hasExplicitNav)) {
         let hasNavInSubdirs = false;
 
         if (normalized.i18n?.default) {
-          const localeScanDir = path.join(navScanDir, normalized.i18n.default);
-          if (fs.existsSync(localeScanDir)) {
-            navScanDir = localeScanDir;
-          }
           // Check if any locale dir has navigation.json
           hasNavInSubdirs = (normalized.i18n.locales || []).some((l: any) =>
             fs.existsSync(path.join(path.resolve(cwd, normalized.srcDir), l.id, 'navigation.json'))
@@ -236,7 +258,6 @@ export async function loadConfig(configPath: string, options: any = {}) {
         if (!hasNavInSubdirs && normalized.versions?.all?.length > 0) {
           hasNavInSubdirs = normalized.versions.all.some((v: any) => {
             const vDir = path.resolve(cwd, v.dir);
-            // Check base dir and locale subdirs
             if (fs.existsSync(path.join(vDir, 'navigation.json'))) return true;
             if (normalized.i18n?.default) {
               return fs.existsSync(path.join(vDir, normalized.i18n.default, 'navigation.json'));
@@ -246,22 +267,10 @@ export async function loadConfig(configPath: string, options: any = {}) {
         }
 
         if (!hasNavInSubdirs) {
-          // Check if navigation.json exists directly in the source root
-          const rootNavPath = path.join(navScanDir, 'navigation.json');
-          if (fs.existsSync(rootNavPath)) {
-            hasNavInSubdirs = true;
-            try {
-              normalized.navigation = JSON.parse(fs.readFileSync(rootNavPath, 'utf-8'));
-            } catch { /* fall through to auto-nav */ }
-          }
-        }
-
-        if (!hasNavInSubdirs) {
           if (!options.quiet && !(global as any).__DOCMD_ZERO_NAV_LOGGED) {
             TUI.info('No navigation settings found. Auto-generating with Zero-Config...');
             if (options.isDev) (global as any).__DOCMD_ZERO_NAV_LOGGED = true;
           }
-
           normalized.navigation = buildAutoNav(navScanDir);
         }
       }

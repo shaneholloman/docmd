@@ -104,7 +104,7 @@ interface RenderPagesOptions {
 }
 
 export async function renderPages({ config, srcDir, fallbackSrcDir, outputDir, hooks, buildHash, options, outputPrefix = '', onProgress, targetFiles }: RenderPagesOptions) {
-  // Reset git root cache (cwd may have changed between multi-project builds)
+  // Reset git root cache (cwd may have changed between workspace builds)
   _cachedGitRoot = null;
 
   // Load Translations for the active locale
@@ -603,6 +603,7 @@ export async function renderPages({ config, srcDir, fallbackSrcDir, outputDir, h
         t,
         buildAbsoluteUrl,
         sanitizeUrl,
+        workspace: config._workspace,
         themeCssLinkHtml: '',
         metaTagsHtml: '',
         pluginStylesHtml: ''

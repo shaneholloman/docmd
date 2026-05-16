@@ -126,7 +126,7 @@ function menubarTarget(item) {
         <% } %>
         <% if (optionsMenu && optionsMenu.position==='menubar' ) { %>
           <div class="menubar-options">
-            <%- await include('options-menu', { optionsMenu, allLocales: locals.allLocales, activeLocale: locals.activeLocale, defaultLocale: locals.defaultLocale, config: locals.config, renderIcon, currentPagePath: locals.currentPagePath, localePrefix: locals.localePrefix }) %>
+            <%- await include('options-menu', { optionsMenu, allLocales: locals.allLocales, activeLocale: locals.activeLocale, defaultLocale: locals.defaultLocale, config: locals.config, renderIcon, currentPagePath: locals.currentPagePath, localePrefix: locals.localePrefix, workspace: locals.workspace }) %>
           </div>
         <% } %>
     </div>

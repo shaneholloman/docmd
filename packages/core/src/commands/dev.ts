@@ -36,12 +36,12 @@ export async function startDevServer(configPathOption: string, opts: any = {}) {
     port: opts.port || undefined,
   };
 
-  // ── Multi-Project Detection ──────────────────────────
+  // ── Multi-Project (Workspace) Detection ──────────────────────────
   if (!process.env.DOCMD_PROJECT_OUT) {
-    const { detectMultiProject, devMultiProject } = await import('../engine/projects.js');
-    const multiConfig = await detectMultiProject(configPathOption);
-    if (multiConfig) {
-      await devMultiProject(multiConfig, options);
+    const { detectWorkspace, devWorkspace } = await import('../engine/workspace.js');
+    const workspaceConfig = await detectWorkspace(configPathOption);
+    if (workspaceConfig) {
+      await devWorkspace(workspaceConfig, options);
       return;
     }
   }

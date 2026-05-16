@@ -1,0 +1,75 @@
+<%# ---------------------------------------------------------------
+  # docmd : the zero-config documentation engine.
+  # @website https://docmd.io
+  # [docmd-source] - Please do not remove this header.
+  # ---------------------------------------------------------------
+%>
+
+<% 
+if (locals.workspace && workspace.projects && workspace.projects.length > 1) { 
+  const currentPrefix = config._activePrefix || '/';
+  const switcherConfig = workspace.switcher || { enabled: true, position: 'sidebar-top' };
+  
+  if (switcherConfig.enabled !== false) {
+    const isCompact = typeof compact !== 'undefined' && compact;
+    const currentProject = workspace.projects.find(p => {
+        const pfx = p.prefix === '/' ? '/' : p.prefix.replace(/\/$/, '');
+        return pfx === currentPrefix;
+    }) || workspace.projects[0];
+
+    const getProjectLabel = (p) => {
+        if (p.title) return p.title;
+        // Fallback: Use the last part of the source directory as a title if prefix is root
+        if (p.prefix === '/' || !p.prefix.replace(/^\//, '')) {
+            const srcParts = p.src.split(/[\/\\]/);
+            const raw = srcParts[srcParts.length - 1];
+            return raw.split(/[\/-]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        }
+        // Fallback for subprojects: use the prefix
+        return p.prefix.replace(/^\//, '').split(/[\/-]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    };
+%>
+<div class="docmd-project-switcher<%= isCompact ? ' project-compact' : '' %>" data-position="<%= switcherConfig.position %>">
+  <button class="project-switcher-toggle" aria-expanded="false" aria-label="<%= typeof t === 'function' ? t('selectProject') : 'Select Project' %>">
+    <%- renderIcon('layers', { class: 'project-icon' }) %>
+    <% if (!isCompact) { %>
+    <span class="project-label"><%= getProjectLabel(currentProject) %></span>
+    <%- renderIcon('chevron-down', { class: 'project-chevron' }) %>
+    <% } %>
+  </button>
+  <ul class="project-switcher-menu">
+    <% workspace.projects.forEach(project => { 
+      const itemPfx = project.prefix === '/' ? '/' : project.prefix.replace(/\/$/, '');
+      const isCurrentActive = itemPfx === currentPrefix;
+      
+      // Calculate Workspace Base (Domain Root -> Workspace Root)
+      // config.base includes the current project's prefix. We need to strip it to find the workspace root.
+      const normalizedBase = (config.base || '/').replace(/\/?$/, '');
+      const normalizedActivePrefix = currentPrefix.replace(/\/?$/, '');
+      const workspaceBase = normalizedBase.endsWith(normalizedActivePrefix) 
+        ? normalizedBase.substring(0, normalizedBase.length - normalizedActivePrefix.length)
+        : normalizedBase;
+
+      const projectPfx = project.prefix.startsWith('/') ? project.prefix : '/' + project.prefix;
+      const absoluteHref = (workspaceBase + projectPfx).replace(/\/+$/, '') || '/';
+    %>
+    <li>
+      <a href="<%= absoluteHref %>" 
+        class="project-switcher-item <%= isCurrentActive ? 'active' : '' %>" 
+        data-spa-ignore>
+        <span class="project-title"><%= getProjectLabel(project) %></span>
+        <% if (project.prefix !== '/') { %>
+          <span class="project-prefix"><%= project.prefix %></span>
+        <% } %>
+        <% if (isCurrentActive) { %>
+          <%- renderIcon('check', { class: 'project-check' }) %>
+        <% } %>
+      </a>
+    </li>
+    <% }) %>
+  </ul>
+</div>
+<% 
+  }
+} 
+%>

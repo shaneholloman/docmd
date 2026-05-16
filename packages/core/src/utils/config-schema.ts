@@ -97,12 +97,15 @@ export function normalizeConfig(userConfig: any) {
     };
 
     // --- Menubar (Top Navigation Bar) ---
-    if (userLayout.menubar) {
+    const userMenubar = userLayout.menubar || config.menubar;
+    if (userMenubar) {
+        const isArray = Array.isArray(userMenubar);
         config.menubar = {
-            position: userLayout.menubar.position || 'top',
-            left: Array.isArray(userLayout.menubar.left) ? userLayout.menubar.left : [],
-            right: Array.isArray(userLayout.menubar.right) ? userLayout.menubar.right : [],
-            ...userLayout.menubar
+            enabled: true,
+            position: (!isArray && userMenubar.position) ? userMenubar.position : 'top',
+            left: isArray ? userMenubar : (Array.isArray(userMenubar.left) ? userMenubar.left : []),
+            right: (!isArray && Array.isArray(userMenubar.right)) ? userMenubar.right : [],
+            ...(!isArray ? userMenubar : {})
         };
         normalizeMenubarPaths(config.menubar.left);
         normalizeMenubarPaths(config.menubar.right);
@@ -156,8 +159,20 @@ export function normalizeConfig(userConfig: any) {
 
     // Normalize Navigation
     config.navigation = Array.isArray(config.navigation) ? config.navigation : [];
-
     normalizeNavPaths(config.navigation);
+
+    // Aliasing for Menubar items (title -> text, path -> url)
+    if (config.menubar) {
+        const normalizeItems = (items: any[]) => {
+            items.forEach(item => {
+                if (item.title && !item.text) item.text = item.title;
+                if (item.path && !item.url) item.url = item.path;
+                if (item.items) normalizeItems(item.items);
+            });
+        };
+        if (config.menubar.left) normalizeItems(config.menubar.left);
+        if (config.menubar.right) normalizeItems(config.menubar.right);
+    }
 
     // --- 5. Plugins ---
     config.hasExplicitPlugins = 'plugins' in userConfig;

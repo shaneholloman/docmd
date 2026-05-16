@@ -72,10 +72,11 @@
       const dropdown = versionToggle.closest('.docmd-version-dropdown');
       dropdown.classList.toggle('open');
       versionToggle.setAttribute('aria-expanded', dropdown.classList.contains('open'));
-      // Close language switcher when opening version dropdown
-      document.querySelectorAll('.docmd-language-switcher.open').forEach(d => {
+      // Close other switchers when opening version dropdown
+      document.querySelectorAll('.docmd-language-switcher.open, .docmd-project-switcher.open').forEach(d => {
         d.classList.remove('open');
-        d.querySelector('.language-switcher-toggle').setAttribute('aria-expanded', 'false');
+        const t = d.querySelector('.language-switcher-toggle, .project-switcher-toggle');
+        if (t) t.setAttribute('aria-expanded', 'false');
       });
       return;
     }
@@ -131,6 +132,12 @@
         d.querySelector('.language-switcher-toggle').setAttribute('aria-expanded', 'false');
       });
     }
+    if (!e.target.closest('.docmd-project-switcher')) {
+      document.querySelectorAll('.docmd-project-switcher.open').forEach(d => {
+        d.classList.remove('open');
+        d.querySelector('.project-switcher-toggle').setAttribute('aria-expanded', 'false');
+      });
+    }
     const langToggle = e.target.closest('.language-switcher-toggle');
     if (langToggle) {
       e.preventDefault();
@@ -139,9 +146,26 @@
       dropdown.classList.toggle('open');
       langToggle.setAttribute('aria-expanded', dropdown.classList.contains('open'));
       // Close version dropdown when opening language switcher
-      document.querySelectorAll('.docmd-version-dropdown.open').forEach(d => {
+      document.querySelectorAll('.docmd-version-dropdown.open, .docmd-project-switcher.open').forEach(d => {
         d.classList.remove('open');
-        d.querySelector('.version-dropdown-toggle').setAttribute('aria-expanded', 'false');
+        const t = d.querySelector('.version-dropdown-toggle, .project-switcher-toggle');
+        if (t) t.setAttribute('aria-expanded', 'false');
+      });
+      return;
+    }
+
+    const projectToggle = e.target.closest('.project-switcher-toggle');
+    if (projectToggle) {
+      e.preventDefault();
+      e.stopPropagation();
+      const dropdown = projectToggle.closest('.docmd-project-switcher');
+      dropdown.classList.toggle('open');
+      projectToggle.setAttribute('aria-expanded', dropdown.classList.contains('open'));
+      // Close other dropdowns
+      document.querySelectorAll('.docmd-version-dropdown.open, .docmd-language-switcher.open').forEach(d => {
+        d.classList.remove('open');
+        const t = d.querySelector('.version-dropdown-toggle, .language-switcher-toggle');
+        if (t) t.setAttribute('aria-expanded', 'false');
       });
       return;
     }

@@ -36,14 +36,14 @@ export async function buildSite(configPath: string, opts: any = {}) {
 
   const CWD = process.cwd();
 
-  // ── Multi-Project Detection ──────────────────────────
-  // If we're NOT already inside a multi-project build (no env var set),
-  // check if the root config has a projects[] array.
+  // ── Multi-Project (Workspace) Detection ──────────────────────────
+  // If we're NOT already inside a workspace build (no env var set),
+  // check if the root config has workspace settings.
   if (!process.env.DOCMD_PROJECT_OUT) {
-    const { detectMultiProject, buildMultiProject } = await import('../engine/projects.js');
-    const multiConfig = await detectMultiProject(configPath);
-    if (multiConfig) {
-      await buildMultiProject(multiConfig, options);
+    const { detectWorkspace, buildWorkspace } = await import('../engine/workspace.js');
+    const workspaceConfig = await detectWorkspace(configPath);
+    if (workspaceConfig) {
+      await buildWorkspace(workspaceConfig, options);
       return;
     }
   }
@@ -53,7 +53,10 @@ export async function buildSite(configPath: string, opts: any = {}) {
 
   // 1. Load Config (Zero-Config aware)
   try {
-    const config = await loadConfig(configPath, { isDev: options.isDev });
+    const config = await loadConfig(configPath, { isDev: options.isDev, _globalDefaults: opts._globalDefaults });
+    config._workspace = opts._workspace || null;
+    config._activePrefix = opts._activePrefix || '/';
+    config._globalDefaults = opts._globalDefaults || null;
     
     // Initialize global WorkerPool (or use provided one)
     const workerScript = path.resolve(__dirname, '../engine/worker-parser.js');
@@ -114,7 +117,7 @@ export async function buildSite(configPath: string, opts: any = {}) {
     const hasIndexingWork = !options.targetFiles && (
       (hooks.onBeforeBuild?.length ?? 0) > 0 || indexingHooks.length > 0
     );
-    if (hasIndexingWork) TUI.section('Data Indexing', TUI.blue);
+    if (hasIndexingWork && !options.quiet) TUI.section('Data Indexing', TUI.blue);
 
     const allGeneratedPages = await buildLocales({
       config,
@@ -236,7 +239,7 @@ export async function buildSite(configPath: string, opts: any = {}) {
           TUI.step(msg, status, TUI.blue);
         },
         tui:     TUI,
-        options: { ...options, quiet: false },
+        options: { ...options, quiet: options.quiet },
         runWorkerTask(modulePath: string, functionName: string, args: any[]) {
           if (!config._workerPool) throw new Error('WorkerPool is not initialized');
           return config._workerPool.runTask({ type: 'plugin-task', modulePath, functionName, args });
@@ -245,13 +248,13 @@ export async function buildSite(configPath: string, opts: any = {}) {
 
       // Indexing — search runs in the already-open Data Indexing section
       for (const fn of indexingHooks) await fn(postBuildCtx);
-      if (hasIndexingWork) TUI.footer(TUI.blue);
+      if (hasIndexingWork && !options.quiet) TUI.footer(TUI.blue);
 
       // Publishing — sitemap, llms, pwa, etc.
       if (publishingHooks.length > 0) {
-        TUI.section('Publishing', TUI.blue);
+        if (!options.quiet) TUI.section('Publishing', TUI.blue);
         for (const fn of publishingHooks) await fn(postBuildCtx);
-        TUI.footer(TUI.blue);
+        if (!options.quiet) TUI.footer(TUI.blue);
       }
     }
 
