@@ -111,19 +111,6 @@ export function buildAutoNav(dir: string, basePath = '/'): any[] { // Default ba
     }
   }
 
-  // If no index exists at this level, and we have files, designate the first one as index
-  if (!indexExists && nav.length > 0) {
-    // Find first file (not a folder) - alphabetical after sorting (sorted below)
-    // But since sort hasn't happened yet, sort copies to pick the true first
-    const fileItems = nav.filter(n => !n.children).sort((a, b) => a.title.localeCompare(b.title));
-    if (fileItems.length > 0) {
-      const firstFile = fileItems[0];
-      // Store the original path before reassigning so the generator knows which file this is
-      firstFile._sourceFile = firstFile.path;
-      firstFile.path = basePath === '/' ? '/' : basePath;
-    }
-  }
-
   // Sort: Put index.md (Home) at the top, then sort alphabetically
   return nav.sort((a, b) => {
     // Check if path effectively points to current folder root
