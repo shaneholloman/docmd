@@ -134,9 +134,20 @@ export async function onPostBuild({ config, outputDir, log }: any) {
   const robotsPath = path.join(outputDir, 'robots.txt');
   const seoConfig = config.plugins?.seo || {};
   
-  // If robots.txt already exists, don't overwrite it
-  if (nativeFs.existsSync(robotsPath)) {
-    if (log) log('robots.txt already exists, skipping generation');
+  // Check if robots.txt already exists in site root OR in assets
+  // (assets are copied to site/assets/ by the core engine)
+  const assetsRobotsPath = path.join(outputDir, 'assets', 'robots.txt');
+  const siteRobotsExists = nativeFs.existsSync(robotsPath);
+  const assetsRobotsExists = nativeFs.existsSync(assetsRobotsPath);
+  
+  if (siteRobotsExists || assetsRobotsExists) {
+    if (log) {
+      if (siteRobotsExists) {
+        log('robots.txt already exists in site root, skipping generation');
+      } else {
+        log('robots.txt found in assets/, will be copied to site/assets/');
+      }
+    }
     return;
   }
   
