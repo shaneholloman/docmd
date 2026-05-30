@@ -27,6 +27,7 @@ declare const MiniSearch: any;
 (function () {
     let miniSearch: any = null;
     let semanticClient: any = null;   // docmd-search client (set when semantic mode)
+    let isIndexLoaded = false;
     let selectedIndex = -1;
     const activeVersionFilters = new Set<string>();
     let globalAllVersions: string[] = [];
