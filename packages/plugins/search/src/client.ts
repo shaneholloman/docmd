@@ -32,7 +32,6 @@ declare const MiniSearch: any;
     let isIndexLoaded = false;
     let selectedIndex = -1;
     const activeVersionFilters = new Set<string>();
-    const showFilters = searchModal.dataset.showFilters !== 'false';
     let globalAllVersions: string[] = [];
     const globalVersionColors: Record<string, {bg: string, fg: string}> = {};
 
@@ -42,6 +41,9 @@ declare const MiniSearch: any;
         const searchResults = document.getElementById('docmd-search-results') as HTMLElement;
 
         if (!searchModal || !searchInput || !searchResults) return;
+
+        // showFilters: hide version filter bar when explicitly set to false
+        const showFilters = searchModal.dataset.showFilters !== 'false';
 
         // Read translated strings from data attributes (injected server-side per locale)
         const strings = {
