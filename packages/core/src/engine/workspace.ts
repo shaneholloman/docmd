@@ -465,7 +465,7 @@ export async function devWorkspace(
   const CWD = process.cwd();
   const rootOutDir = path.resolve(CWD, workspaceConfig.out || 'site');
 
-  const { serveStatic, findAvailablePort, formatPathForDisplay, getNetworkIp } = await import('../utils/dev-utils.js');
+  const { serveStatic, findAvailablePort, formatPathForDisplay, getNetworkIp, openBrowser } = await import('../utils/dev-utils.js');
   const http = await import('http');
   const { WebSocketServer, WebSocket } = await import('ws');
 
@@ -509,6 +509,9 @@ export async function devWorkspace(
     }
     TUI.item('', '', TUI.dim, TUI.green);
     TUI.footer(TUI.green);
+
+    // Auto-launch localhost URL in default browser
+    openBrowser(localUrl);
   });
 
   let isRebuilding = false;
@@ -531,7 +534,7 @@ export async function devWorkspace(
         if (isRebuilding) return;
         isRebuilding = true;
 
-        const isConfigUpdate = filename.includes('docmd.config') && !filename.includes('docmd.config-');
+        const isConfigUpdate = (filename.includes('docmd.config') && !filename.includes('docmd.config-')) || filename.includes('navigation.json');
         const label = project.prefix === '/' ? '/' : project.prefix;
         const displayPath = filename.replace(/^[^/]+\//, '');
         const rebuildElapsed = TUI.timer();
