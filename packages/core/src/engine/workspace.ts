@@ -516,6 +516,8 @@ export async function devWorkspace(
 
   let isRebuilding = false;
   let rebuildTimeout: any = null;
+  let lastRebuildAt = 0;
+  const REBUILD_QUIET_MS = 1200;
 
   const workspace = workspaceConfig.workspace!;
   for (const project of workspace.projects) {
@@ -525,9 +527,18 @@ export async function devWorkspace(
 
     nativeFs.watch(projectSrcDir, { recursive: true }, (event, filename) => {
       if (!filename) return;
+
+      // Post-rebuild quiet period
+      if (Date.now() - lastRebuildAt < REBUILD_QUIET_MS) return;
+
       if (filename.includes('.git') || filename.includes('node_modules') ||
           filename.includes('.DS_Store') || filename.startsWith('.') ||
           filename.includes('docmd.config-') || filename.endsWith('.js.bak')) return;
+
+      // Exclude build output
+      const resolvedOut = path.resolve(CWD, workspaceConfig.out || 'site');
+      const filePath = path.resolve(projectSrcDir, filename);
+      if (filePath.startsWith(resolvedOut + path.sep) || filePath === resolvedOut) return;
 
       if (rebuildTimeout) clearTimeout(rebuildTimeout);
       rebuildTimeout = setTimeout(async () => {
@@ -551,6 +562,7 @@ export async function devWorkspace(
             isDev: true,
             targetFiles: isConfigUpdate ? undefined : [fullChangedPath]
           });
+          lastRebuildAt = Date.now();
           broadcastReload();
           TUI.step(`Rebuilt [${label}] ${isConfigUpdate ? 'with new config' : displayPath} in ${rebuildElapsed()}`, 'DONE', TUI.blue, true);
         } catch (err: any) {
@@ -564,13 +576,11 @@ export async function devWorkspace(
   }
 
   if (workspaceConfig._resolvedPath && nativeFs.existsSync(workspaceConfig._resolvedPath)) {
-    let rootConfigLock = false;
+    let rootConfigDebounce: any = null;
     nativeFs.watch(workspaceConfig._resolvedPath, () => {
-      if (rootConfigLock) return;
-      rootConfigLock = true;
-
-      if (rebuildTimeout) clearTimeout(rebuildTimeout);
-      rebuildTimeout = setTimeout(async () => {
+      if (rootConfigDebounce) clearTimeout(rootConfigDebounce);
+      rootConfigDebounce = setTimeout(async () => {
+        rootConfigDebounce = null;
         if (isRebuilding) return;
         isRebuilding = true;
 
@@ -583,6 +593,7 @@ export async function devWorkspace(
           if (newWorkspaceConfig) {
             Object.assign(workspaceConfig, newWorkspaceConfig);
             await buildWorkspace(newWorkspaceConfig, { isDev: true, quiet: true });
+            lastRebuildAt = Date.now();
             broadcastReload();
             TUI.step(`Rebuilt entire workspace with new config in ${rebuildElapsed()}`, 'DONE', TUI.blue, true);
           }
@@ -591,9 +602,8 @@ export async function devWorkspace(
           TUI.error('Rebuild failed', err.message);
         } finally {
           isRebuilding = false;
-          setTimeout(() => { rootConfigLock = false; }, 500);
         }
-      }, 300);
+      }, 500);
     });
   }
 

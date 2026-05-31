@@ -128,8 +128,14 @@ export async function startDevServer(configPathOption: string, opts: any = {}) {
   let isRebuilding = false;
   let rebuildQueued = false;
   let rebuildTimeout: any = null;
+  let lastRebuildAt = 0;           // timestamp; used for post-rebuild quiet period
+  const REBUILD_QUIET_MS = 1200;   // ignore watcher events for this long after a rebuild
+
+  // Resolved output dir for robust exclusion (never retrigger on build output)
+  const resolvedOutputDir = path.resolve(CWD, config.out || 'site');
 
   let configLock = false;
+  let configDebounce: any = null;
   async function reloadConfigAndRebuild(changedFilePath: string) {
     if (configLock) return;
     configLock = true;
@@ -163,11 +169,15 @@ export async function startDevServer(configPathOption: string, opts: any = {}) {
         workerPool
       });
 
+      lastRebuildAt = Date.now();
       TUI.step(`Config reloaded and rebuilt in ${configElapsed()}`, 'DONE', TUI.blue, true);
 
-      // Re-setup watchers
-      setupContentWatchers();
-      setupConfigWatcher();
+      // Re-setup watchers after a brief pause to let fs.watch settle
+      setTimeout(() => {
+        setupContentWatchers();
+        setupConfigWatcher();
+        configLock = false;
+      }, REBUILD_QUIET_MS);
 
       broadcastReload();
     } catch (error: any) {
@@ -175,10 +185,11 @@ export async function startDevServer(configPathOption: string, opts: any = {}) {
       TUI.error('Config reload failed', error.message);
       
       // Re-setup watchers to continue listening
-      setupContentWatchers();
-      setupConfigWatcher();
-    } finally {
-      configLock = false;
+      setTimeout(() => {
+        setupContentWatchers();
+        setupConfigWatcher();
+        configLock = false;
+      }, REBUILD_QUIET_MS);
     }
   }
 
@@ -197,30 +208,44 @@ export async function startDevServer(configPathOption: string, opts: any = {}) {
       );
     }
 
+    // Resolved output dir — used for robust exclusion below
+    const resolvedOut = path.resolve(CWD, paths.outputDir);
+
     for (const watchPath of contentPaths) {
       if (!nativeFs.existsSync(watchPath)) continue;
 
       const watcher = nativeFs.watch(watchPath, { recursive: true }, (event, filename) => {
         if (!filename) return;
-        
-        const filePath = path.join(watchPath, filename);
-        const relativeFilePath = path.relative(CWD, filePath);
-        
+
+        // Post-rebuild quiet period: swallow stale fs.watch events
+        if (Date.now() - lastRebuildAt < REBUILD_QUIET_MS) return;
+
+        const filePath = path.resolve(watchPath, filename);
+
+        // Exclude build output dir (absolute path check — reliable across platforms)
+        if (filePath.startsWith(resolvedOut + path.sep) || filePath === resolvedOut) return;
+
+        // Common noise exclusions
         if (
-          relativeFilePath.startsWith(path.relative(CWD, paths.outputDir)) ||
-          filename.includes('.git') || 
-          filename.includes('node_modules') || 
+          filename.includes('.git') ||
+          filename.includes('node_modules') ||
           filename.startsWith('.') ||
-          relativeFilePath.includes('.DS_Store')
+          filename.includes('.DS_Store')
         ) return;
 
-        const isAsset = filePath.startsWith(paths.userAssetsDir);
-        const isConfigOrNav = 
-          filename.includes('navigation.json') || 
+        const relativeFilePath = path.relative(CWD, filePath);
+        const isAsset = filePath.startsWith(path.resolve(paths.userAssetsDir));
+        const isConfigOrNav =
+          filename.includes('navigation.json') ||
           (filename.includes('docmd.config') && !filename.includes('docmd.config-'));
 
         if (isConfigOrNav) {
-          reloadConfigAndRebuild(filePath);
+          // Debounce config/nav reloads separately to collapse macOS multi-fire
+          if (configDebounce) clearTimeout(configDebounce);
+          configDebounce = setTimeout(() => {
+            configDebounce = null;
+            reloadConfigAndRebuild(filePath);
+          }, 400);
           return;
         }
 
@@ -228,19 +253,20 @@ export async function startDevServer(configPathOption: string, opts: any = {}) {
         rebuildTimeout = setTimeout(() => {
           const executeBuildFn = async () => {
             if (isRebuilding) { rebuildQueued = true; return; }
-            
+
             const rebuildElapsed = TUI.timer();
             const sp = TUI.spinner(`Rebuilding: ${relativeFilePath}`, TUI.blue);
             isRebuilding = true;
             rebuildQueued = false;
             try {
-              await buildSite(configPathOption, { 
-                isDev: true, 
+              await buildSite(configPathOption, {
+                isDev: true,
                 preserve: options.preserve,
                 quiet: true,
                 targetFiles: isAsset ? undefined : [filePath],
                 workerPool
               });
+              lastRebuildAt = Date.now();
               sp.done(`Rebuilt: ${relativeFilePath} in ${rebuildElapsed()}`, true);
               broadcastReload();
             } catch (error: any) {
@@ -260,8 +286,14 @@ export async function startDevServer(configPathOption: string, opts: any = {}) {
 
   const setupConfigWatcher = () => {
     if (!hasConfigFile) return;
+    let cfgDebounce: any = null;
     const configWatcher = nativeFs.watch(configWatchPath, () => {
-      reloadConfigAndRebuild(configWatchPath);
+      // Debounce: collapse the 3-6 rapid events macOS fires per save into one
+      if (cfgDebounce) clearTimeout(cfgDebounce);
+      cfgDebounce = setTimeout(() => {
+        cfgDebounce = null;
+        reloadConfigAndRebuild(configWatchPath);
+      }, 500);
     });
     watchers.push(configWatcher);
   };
