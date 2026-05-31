@@ -5,8 +5,10 @@
   "description": "The minimalist, zero-config documentation generator monorepo.",
   "scripts": {
     "dev": "pnpm docmd dev",
+    "live": "pnpm docmd-live",
     "build": "pnpm -r run build",
     "docmd": "node packages/core/dist/bin/docmd.js --cwd packages/_playground",
+    "docmd-live": "node packages/live/bin/docmd-live.js --cwd packages/_playground",
     "prep": "node scripts/prep.js",
     "verify": "node scripts/verify.js",
     "lint": "eslint .",
