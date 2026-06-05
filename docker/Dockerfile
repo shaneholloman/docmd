@@ -63,6 +63,9 @@ RUN pnpm -r run build
 # Resolve workspace:* deps to real version numbers for standalone use
 RUN node scripts/resolve-ws-deps.js
 
+# Pack all packages into tarballs (mimics npm publish)
+RUN pnpm -r pack --pack-destination /tarballs
+
 # -----------------------------------------------------------------------------
 # Stage 2: Production stage - minimal image with only runtime dependencies
 # -----------------------------------------------------------------------------
@@ -74,7 +77,7 @@ RUN apk add --no-cache \
     curl \
     bash
 
-# Install pnpm globally for any plugin installations
+# Install pnpm globally
 RUN corepack enable && corepack prepare pnpm@10.33.2 --activate
 
 # Create non-root user for security
@@ -83,82 +86,26 @@ RUN addgroup -g 1001 -S docmd && \
 
 WORKDIR /app
 
-# Copy built packages from builder (using wildcards for automation)
-# Copy all dist directories and package.json files
-COPY --from=builder --chown=docmd:docmd /app/package.json ./package.json
-COPY --from=builder --chown=docmd:docmd /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+# Copy packed tarballs from builder
+COPY --from=builder /tarballs /tarballs
 
-# Copy all packages (dist, package.json, and necessary assets)
-# Exclude _playground and node_modules (we'll copy node_modules separately)
-COPY --from=builder --chown=docmd:docmd /app/packages/core ./packages/core
-COPY --from=builder --chown=docmd:docmd /app/packages/api ./packages/api
-COPY --from=builder --chown=docmd:docmd /app/packages/parser ./packages/parser
-COPY --from=builder --chown=docmd:docmd /app/packages/utils ./packages/utils
-COPY --from=builder --chown=docmd:docmd /app/packages/ui ./packages/ui
-COPY --from=builder --chown=docmd:docmd /app/packages/tui ./packages/tui
-COPY --from=builder --chown=docmd:docmd /app/packages/deployer ./packages/deployer
-COPY --from=builder --chown=docmd:docmd /app/packages/themes ./packages/themes
-COPY --from=builder --chown=docmd:docmd /app/packages/live ./packages/live
-COPY --from=builder --chown=docmd:docmd /app/packages/legacy ./packages/legacy
+# Install ONLY @docmd/core from the tarball — this pulls in all its dependencies
+# from the other tarballs, creating the exact same structure as `npm install @docmd/core`
+RUN pnpm add --global /tarballs/docmd-core-*.tgz \
+    --prefer-offline \
+    --registry file:///tarballs
 
-# Copy engines
-COPY --from=builder --chown=docmd:docmd /app/packages/engines/js ./packages/engines/js
-COPY --from=builder --chown=docmd:docmd /app/packages/engines/rust ./packages/engines/rust
+# Clean up tarballs and pnpm cache to reduce image size
+RUN rm -rf /tarballs ~/.local/share/pnpm/store
 
-# Copy all plugins using wildcard
-COPY --from=builder --chown=docmd:docmd /app/packages/plugins ./packages/plugins
+# Create directories for user content
+RUN mkdir -p /docs /site && chown -R docmd:docmd /docs /site
 
-# Copy root node_modules
-COPY --from=builder --chown=docmd:docmd /app/node_modules ./node_modules
-
-# Create directories for user content and starter template
-RUN mkdir -p /docs /site /template && chown -R docmd:docmd /docs /site /template
-
-# Create a starter template that users can use to initialize new projects
-RUN mkdir -p /template/docs /template/assets/css /template/assets/js /template/assets/images
-
-# Create default index.md for starter template
-RUN printf '%s\n' \
-    '---' \
-    'title: "Welcome"' \
-    'description: "Welcome to your new documentation site."' \
-    '---' \
-    '' \
-    '# Welcome to Your Docs! 🚀' \
-    '' \
-    'Congratulations! You have successfully initialised a new **docmd** project.' \
-    '' \
-    '## Quick Start' \
-    '' \
-    '```bash' \
-    'docmd dev   # Start the dev server' \
-    'docmd build # Build for production' \
-    '```' \
-    '' \
-    'Happy documenting! 🎉' \
-    > /template/docs/index.md
-
-# Create default docmd.config.json for starter template
-RUN printf '%s\n' \
-    '{' \
-    '  "title": "My Documentation",' \
-    '  "description": "Documentation built with docmd",' \
-    '  "url": "https://docs.example.com"' \
-    '}' \
-    > /template/docmd.config.json
-
-# Create wrapper script for docmd CLI
-RUN printf '%s\n' \
-    '#!/bin/bash' \
-    'if [ "$1" = "init" ]; then' \
-    '  echo "Initializing new docmd project..."' \
-    '  cp -r /template/docs /workspace/ 2>/dev/null || cp -r /template/docs ./ 2>/dev/null || true' \
-    '  cp /template/docmd.config.json /workspace/ 2>/dev/null || cp /template/docmd.config.json ./ 2>/dev/null || true' \
-    '  echo "✅ Project initialized"' \
-    'else' \
-    '  node /app/packages/core/dist/bin/docmd.js "$@"' \
-    'fi' \
-    > /usr/local/bin/docmd && chmod +x /usr/local/bin/docmd
+# Seed the default template by running docmd init non-interactively.
+# This ensures the image ships exactly what a real `docmd init` produces.
+RUN mkdir -p /template && \
+    cd /template && \
+    echo 'y' | docmd init || true
 
 # Set environment variables
 ENV NODE_ENV=production
