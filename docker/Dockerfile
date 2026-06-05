@@ -52,15 +52,10 @@ COPY . .
 # Install dependencies
 RUN pnpm install --frozen-lockfile
 
-# Stub out build scripts that can't run in Docker:
-#   - engine-rust-binaries: requires cargo (Rust compiler), not available here
-#   - _playground: runs a full docmd build, not needed in the image
-RUN node -e "const fs=require('fs'); \
-  ['packages/engines/rust-binaries/package.json','packages/_playground/package.json'].forEach(p=>{ \
-    const pkg=JSON.parse(fs.readFileSync(p,'utf8')); \
-    pkg.scripts=pkg.scripts||{}; pkg.scripts.build='echo skipped'; \
-    fs.writeFileSync(p,JSON.stringify(pkg,null,2)); \
-  });"
+# Stub out packages that can't build in Docker before running the full build:
+#   - engine-rust-binaries: requires cargo; pre-built .node files are in the repo
+#   - _playground: dev sandbox, not part of the production image
+RUN sh scripts/docker-prebuild.sh
 
 # Build all packages
 RUN pnpm -r run build
