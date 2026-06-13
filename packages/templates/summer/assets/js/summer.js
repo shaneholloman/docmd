@@ -129,6 +129,22 @@
   function wireSidebarGroups() {
     var groups = $$('.summer-sidebar nav li.nav-group');
     groups.forEach(function (group) {
+      var key = 'summer-sidebar:' + (group.querySelector('.nav-item-title')?.textContent.trim() || 'group');
+
+      // Restore persisted collapse state on load
+      try {
+        var saved = localStorage.getItem(key);
+        if (saved === '0') {
+          group.setAttribute('aria-expanded', 'false');
+          group.classList.add('collapsed');
+          group.classList.remove('expanded');
+        } else if (saved === '1') {
+          group.setAttribute('aria-expanded', 'true');
+          group.classList.add('expanded');
+          group.classList.remove('collapsed');
+        }
+      } catch (_) {}
+
       var toggle = group.querySelector(':scope > .nav-label, :scope > a');
       if (!toggle) return;
       toggle.addEventListener('click', function (e) {
@@ -140,7 +156,6 @@
         group.classList.toggle('expanded', !expanded);
         group.classList.toggle('collapsed', expanded);
         try {
-          var key = 'summer-sidebar:' + (group.querySelector('.nav-item-title')?.textContent.trim() || 'group');
           localStorage.setItem(key, expanded ? '0' : '1');
         } catch (_) {}
       });
@@ -722,6 +737,121 @@
     });
   }
 
+  // -------- Switcher dropdowns (version / project / language) ---------
+  // These ship as raw partials from docmd core (no JS), so summer wires
+  // the open/close behaviour and outside-click handling itself.
+
+  function wireSwitcherDropdowns() {
+    var groups = $$('.docmd-version-dropdown, .docmd-project-switcher, .docmd-language-switcher');
+    if (!groups.length) return;
+
+    function closeAll(except) {
+      groups.forEach(function (g) {
+        if (g === except) return;
+        g.classList.remove('open');
+        var btn = g.querySelector('button[aria-expanded]');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+      });
+    }
+
+    groups.forEach(function (group) {
+      var btn = group.querySelector('button[aria-expanded], .version-dropdown-toggle, .project-switcher-toggle, .language-switcher-toggle');
+      if (!btn) return;
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var willOpen = !group.classList.contains('open');
+        closeAll(group);
+        group.classList.toggle('open', willOpen);
+        btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+      });
+    });
+
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest('.docmd-version-dropdown, .docmd-project-switcher, .docmd-language-switcher')) {
+        closeAll(null);
+      }
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeAll(null);
+    });
+  }
+
+  // -------- Git last-updated popover toggle (keyboard) ---------------
+  // Hover is handled in CSS; this adds click + keyboard support so the
+  // popover is reachable without a mouse.
+
+  function wireGitPopover() {
+    $$('.summer-pagefooter__time.has-commits').forEach(function (el) {
+      el.addEventListener('click', function (e) {
+        e.preventDefault();
+        var open = el.classList.toggle('open');
+        el.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+      el.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          el.click();
+        } else if (e.key === 'Escape') {
+          el.classList.remove('open');
+          el.setAttribute('aria-expanded', 'false');
+          el.blur();
+        }
+      });
+    });
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest('.summer-pagefooter__time.has-commits')) {
+        $$('.summer-pagefooter__time.has-commits.open').forEach(function (el) {
+          el.classList.remove('open');
+          el.setAttribute('aria-expanded', 'false');
+        });
+      }
+    });
+  }
+
+  // -------- Relative date rendering (lightweight) --------------------
+  // Renders any [data-timestamp] as a human-readable relative date.
+  // We avoid pulling in a date library for this tiny feature.
+
+  function formatRelative(ts) {
+    var now = Date.now();
+    var diff = Math.max(0, now - ts);
+    var sec = Math.floor(diff / 1000);
+    if (sec < 45) return 'just now';
+    var min = Math.floor(sec / 60);
+    if (min < 60) return min + ' min ago';
+    var hr = Math.floor(min / 60);
+    if (hr < 24) return hr + ' hr ago';
+    var day = Math.floor(hr / 24);
+    if (day < 7) return day + ' day' + (day === 1 ? '' : 's') + ' ago';
+    if (day < 30) {
+      var wk = Math.floor(day / 7);
+      return wk + ' week' + (wk === 1 ? '' : 's') + ' ago';
+    }
+    if (day < 365) {
+      var mo = Math.floor(day / 30);
+      return mo + ' month' + (mo === 1 ? '' : 's') + ' ago';
+    }
+    var yr = Math.floor(day / 365);
+    return yr + ' year' + (yr === 1 ? '' : 's') + ' ago';
+  }
+
+  function renderRelativeTimestamps() {
+    $$('[data-timestamp]').forEach(function (el) {
+      var raw = el.getAttribute('data-timestamp');
+      if (!raw) return;
+      var ts = parseInt(raw, 10);
+      if (!isFinite(ts) || ts <= 0) return;
+      // Use a child span if one exists (git popover meta), else replace
+      var target = el.querySelector('.git-time, .summer-git-popover__date') || el;
+      if (target !== el && target.children.length > 0) return;
+      if (!target.__renderedAt || (Date.now() - target.__renderedAt) > 60000) {
+        target.textContent = formatRelative(ts);
+        target.__renderedAt = Date.now();
+      }
+    });
+  }
+
   // -------- Init --------------------------------------------------------
 
   ready(function () {
@@ -730,6 +860,7 @@
 
     wireThemeToggle();
     wireSubnavDropdowns();
+    wireSwitcherDropdowns();
     wireSidebar();
     wireSidebarGroups();
     wireTocScrollSpy();
@@ -739,5 +870,7 @@
     wirePageCopyButtons();
     wireBannerClose();
     wireHeaderSearch();
+    wireGitPopover();
+    renderRelativeTimestamps();
   });
 })();
