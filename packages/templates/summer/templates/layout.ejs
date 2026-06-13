@@ -72,11 +72,13 @@
   <%
     const _noSidebar = (sidebarConfig?.enabled === false);
     const _noToc = (config.theme?.toc === false);
+    const _noHeader = (headerConfig?.enabled === false);
     const _hasMenubar = (locals.menubarConfig && menubarConfig?.enabled !== false);
     const _hasBanner = (locals.config && config.layout && config.layout.banner);
     const _bodyClasses = ['summer-template'];
     if (_noSidebar) _bodyClasses.push('no-sidebar');
     if (_noToc) _bodyClasses.push('no-toc');
+    if (_noHeader) _bodyClasses.push('no-header');
     if (_hasMenubar) _bodyClasses.push('has-menubar');
     if (_hasBanner) _bodyClasses.push('has-banner');
   %>
@@ -378,7 +380,7 @@
       </article>
 
       <% if (config.pageNavigation && (prevPage || nextPage)) { %>
-        <nav class="summer-pagenav" aria-label="Page navigation">
+        <nav class="summer-pagenav<%= (!prevPage ? ' no-prev' : '') %><%= (!nextPage ? ' no-next' : '') %>" aria-label="Page navigation">
           <% if (prevPage) { %>
             <a href="<%= prevPage.url %>" class="summer-pagenav__link summer-pagenav__link--prev">
               <svg class="summer-pagenav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
@@ -387,13 +389,6 @@
                 <span class="summer-pagenav__title"><%= prevPage.title %></span>
               </span>
             </a>
-          <% } else { %>
-            <span class="summer-pagenav__link summer-pagenav__link--disabled">
-              <span class="summer-pagenav__label">
-                <span class="summer-pagenav__small"><%= typeof t === 'function' ? t('previous') : 'Previous' %></span>
-                <span class="summer-pagenav__title">—</span>
-              </span>
-            </span>
           <% } %>
           <% if (nextPage) { %>
             <a href="<%= nextPage.url %>" class="summer-pagenav__link summer-pagenav__link--next">
@@ -403,13 +398,6 @@
               </span>
               <svg class="summer-pagenav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
             </a>
-          <% } else { %>
-            <span class="summer-pagenav__link summer-pagenav__link--disabled summer-pagenav__link--next">
-              <span class="summer-pagenav__label">
-                <span class="summer-pagenav__small"><%= typeof t === 'function' ? t('next') : 'Next' %></span>
-                <span class="summer-pagenav__title">—</span>
-              </span>
-            </span>
           <% } %>
         </nav>
       <% } %>
@@ -425,9 +413,34 @@
             <span></span>
           <% } %>
           <% if (locals.frontmatter?._git?.lastUpdatedTimestamp) { %>
-            <span class="summer-pagefooter__time" data-timestamp="<%= locals.frontmatter._git.lastUpdatedTimestamp %>">
+            <span class="summer-pagefooter__time<%= (locals.frontmatter._git.commits && locals.frontmatter._git.commits.length > 0) ? ' has-commits' : '' %>" data-timestamp="<%= locals.frontmatter._git.lastUpdatedTimestamp %>" tabindex="0" aria-haspopup="true" aria-expanded="false">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
               <span><%= typeof t === 'function' ? t('lastUpdated') : 'Last updated' %>: <time datetime="<%= new Date(locals.frontmatter._git.lastUpdatedTimestamp).toISOString() %>"><%= new Date(locals.frontmatter._git.lastUpdatedTimestamp).toLocaleDateString() %></time></span>
+              <% if (locals.frontmatter._git.commits && locals.frontmatter._git.commits.length > 0) { %>
+                <div class="summer-git-popover" role="tooltip">
+                  <div class="summer-git-popover__title"><%= typeof t === 'function' ? t('recentCommits') : 'Recent commits' %></div>
+                  <ul class="summer-git-popover__list">
+                    <% locals.frontmatter._git.commits.slice(0, 6).forEach(function(commit) { %>
+                      <li class="summer-git-popover__item">
+                        <div class="summer-git-popover__avatar" title="<%= commit.author %>">
+                          <% if (commit.avatarUrl) { %>
+                            <img src="<%= commit.avatarUrl %>" alt="<%= commit.author %>" loading="lazy">
+                          <% } else { %>
+                            <%= commit.author.split(' ').map(function(n){return n[0];}).join('').substring(0, 2).toUpperCase() %>
+                          <% } %>
+                        </div>
+                        <div class="summer-git-popover__details">
+                          <div class="summer-git-popover__msg" title="<%= commit.message %>"><%= commit.message.length > 60 ? commit.message.substring(0, 57) + '…' : commit.message %></div>
+                          <div class="summer-git-popover__meta">
+                            <span class="summer-git-popover__author"><%= commit.author %></span>
+                            <span class="summer-git-popover__date" data-timestamp="<%= commit.timestamp %>"></span>
+                          </div>
+                        </div>
+                      </li>
+                    <% }); %>
+                  </ul>
+                </div>
+              <% } %>
             </span>
           <% } %>
         </div>
