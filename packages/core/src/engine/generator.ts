@@ -172,7 +172,12 @@ export async function renderPages({ config, srcDir, fallbackSrcDir, outputDir, h
   //   15 = user customCss (always wins)
   //   20 = other plugins
   // Within the same priority, the order of registration is preserved.
-  const assetTags: { head: { priority: number; gen: (rel: string) => string }[]; body: { priority: number; gen: (rel: string) => string }[] } = {
+  //
+  // Assets fall into two buckets per position:
+  //   - `commonXxx`  — emitted on EVERY page (legacy behaviour)
+  //   - `condXxx`    — gated by an AssetCondition; evaluated per page
+  type AssetEntry = { priority: number; gen: (rel: string) => string; condition?: any };
+  const assetTags: { head: AssetEntry[]; body: AssetEntry[] } = {
     head: [],
     body: [],
   };
@@ -232,14 +237,15 @@ export async function renderPages({ config, srcDir, fallbackSrcDir, outputDir, h
             // Plugin assets without an explicit priority land at 20 (last).
             const priority = typeof asset.priority === 'number' ? asset.priority : 20;
             const bucket = asset.location === 'head' ? assetTags.head : assetTags.body;
-            bucket.push({ priority, gen: tagGen });
+            bucket.push({ priority, gen: tagGen, condition: (asset as any).condition });
           }
         }
       }
     }
   }
 
-  // Sort each bucket by priority (stable).
+  // Sort each bucket by priority (stable). Conditional assets stay in the same
+  // list — the per-page renderer filters them via the `condition` predicate.
   const sortByPriority = (a: { priority: number }, b: { priority: number }) => a.priority - b.priority;
   assetTags.head.sort(sortByPriority);
   assetTags.body.sort(sortByPriority);
@@ -524,15 +530,13 @@ export async function renderPages({ config, srcDir, fallbackSrcDir, outputDir, h
         return { ...node, url: buildRelativeUrl(node.path) };
       };
 
-      // Inject Assets
-      const assetHeadHtml = assetTags.head.map((e: any) => e.gen(relativePathToRoot)).join('\n');
-      const assetBodyHtml = assetTags.body.map((e: any) => e.gen(relativePathToRoot)).join('\n');
-      
       // ── Phase 3A: Invoke onBeforeRender Hook ──
-      const pageContext = { 
-        frontmatter: page.frontmatter, 
-        outputPath: page.outputPath, 
-        sourcePath: page.sourcePath, 
+      // (Run BEFORE asset injection so plugins can mutate page.htmlContent /
+      // page.frontmatter and the conditional asset filter sees the final state.)
+      const pageContext = {
+        frontmatter: page.frontmatter,
+        outputPath: page.outputPath,
+        sourcePath: page.sourcePath,
         urls: pageUrls,
         html: page.htmlContent
       };
@@ -546,6 +550,39 @@ export async function renderPages({ config, srcDir, fallbackSrcDir, outputDir, h
       // Reflect any mutations from plugins
       page.htmlContent = pageContext.html;
       page.frontmatter = pageContext.frontmatter;
+
+      // Evaluate conditional assets against the *final* page state. This is
+      // what makes features like conditional mermaid loading work — a page
+      // that doesn't render any `class="mermaid"` block never gets the
+      // `init-mermaid.js` <script> (and therefore never fetches the ~500 KB
+      // mermaid library from the CDN at runtime).
+      const matchesCondition = (condition: any): boolean => {
+        if (!condition || typeof condition !== 'object') return true;
+        const fm = page.frontmatter || {};
+        const html = page.htmlContent || '';
+
+        if (condition.pageHtmlMatches != null) {
+          const needles = Array.isArray(condition.pageHtmlMatches)
+            ? condition.pageHtmlMatches
+            : [condition.pageHtmlMatches];
+          const anyHit = needles.some((n: string) => typeof n === 'string' && n.length > 0 && html.includes(n));
+          if (!anyHit) return false;
+        }
+        if (condition.frontmatterHas != null) {
+          if (typeof condition.frontmatterHas !== 'string') return false;
+          if (!Object.prototype.hasOwnProperty.call(fm, condition.frontmatterHas)) return false;
+        }
+        return true;
+      };
+
+      const renderAssetList = (entries: AssetEntry[]) =>
+        entries
+          .filter(e => matchesCondition(e.condition))
+          .map(e => e.gen(relativePathToRoot))
+          .join('\n');
+
+      const assetHeadHtml = renderAssetList(assetTags.head);
+      const assetBodyHtml = renderAssetList(assetTags.body);
 
       const headInjections = await Promise.all(hooks.injectHead.map((fn: any) => fn(config, pageContext, relativePathToRoot)));
       const bodyInjections = await Promise.all(hooks.injectBody.map((fn: any) => fn(config, pageContext)));
