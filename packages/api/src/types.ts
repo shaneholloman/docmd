@@ -502,6 +502,32 @@ export interface Asset {
   /** Optional inline content (mutually exclusive with `path`). */
   inline?: string;
 
+  /**
+   * Optional condition for conditional loading. When set, the asset's `<link>`
+   * or `<script>` tag is only emitted on pages where the condition matches.
+   *
+   * Omit this field (or leave `condition` undefined) to keep the legacy
+   * behaviour: include the asset on every page.
+   *
+   * Evaluated per page at build time, so the cost is paid once during the
+   * build, not at runtime. Conditional assets still have their files copied
+   * to the output directory as usual — only the HTML tag is skipped when the
+   * condition fails.
+   *
+   * @example  Only load mermaid on pages that actually have a diagram block
+   * ```ts
+   * {
+   *   src: 'init-mermaid.js',
+   *   dest: 'assets/js/init-mermaid.js',
+   *   type: 'js',
+   *   position: 'body',
+   *   attributes: { type: 'module' },
+   *   condition: { pageHtmlMatches: 'class="mermaid"' }
+   * }
+   * ```
+   */
+  condition?: AssetCondition;
+
   // --- Legacy aliases (deprecated; kept for backwards compat with 0.8.x) ---
   /** @deprecated Use `path`. */
   src?: string;
@@ -511,6 +537,30 @@ export interface Asset {
   location?: 'head' | 'body' | 'none';
   /** @deprecated Use `position`. Legacy maps to `head`/`body`/`none`. */
   attributes?: Record<string, string | boolean>;
+}
+
+/**
+ * Predicate evaluated against the rendered page to decide whether a
+ * conditional asset should be injected. All keys present in the condition
+ * must match (logical AND). Within a key, multiple values are OR-ed.
+ */
+export interface AssetCondition {
+  /**
+   * The asset is injected only if the page's HTML (post-markdown, pre-template)
+   * contains at least one of the given substrings. Use this to gate JS bundles
+   * that init a specific markup — e.g. `class="mermaid"` for mermaid blocks,
+   * `class="katex"` for KaTeX math, etc.
+   *
+   * Substring (not selector) so the check stays O(n) and dependency-free.
+   * For more advanced matching, combine multiple substrings (OR-ed).
+   */
+  pageHtmlMatches?: string | string[];
+  /**
+   * The asset is injected only if the page's parsed frontmatter has this key
+   * defined (any value, including `false`). Useful when a page opts in via
+   * frontmatter (e.g. `math: true`).
+   */
+  frontmatterHas?: string;
 }
 
 // ---------------------------------------------------------------------------

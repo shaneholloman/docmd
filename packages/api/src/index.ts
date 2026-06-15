@@ -89,6 +89,7 @@ export type {
   SearchIndexPayload,
   // Assets
   Asset,
+  AssetCondition,
   AssetKind,
   AssetPosition,
   // Template system
