@@ -554,12 +554,6 @@
       // RIGHT: copy button (re-home from inner wrapper)
       if (copyBtn) {
         copyBtn.classList.add('summer-cb__copy');
-        if (!copyBtn.querySelector('.summer-cb__copy-label')) {
-          var lbl = document.createElement('span');
-          lbl.className = 'summer-cb__copy-label';
-          lbl.textContent = 'Copy';
-          copyBtn.appendChild(lbl);
-        }
         header.appendChild(copyBtn);
       }
     });
@@ -604,12 +598,6 @@
       if (copyBtn) {
         copyBtn.classList.add('summer-cb__copy');
         wrap.removeChild(copyBtn);
-        if (!copyBtn.querySelector('.summer-cb__copy-label')) {
-          var lbl = document.createElement('span');
-          lbl.className = 'summer-cb__copy-label';
-          lbl.textContent = 'Copy';
-          copyBtn.appendChild(lbl);
-        }
         header.appendChild(copyBtn);
       }
 
@@ -621,14 +609,23 @@
 
   // Build a small file-icon SVG (shared by both codeblock paths above).
   function makeFileIcon() {
-    var icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    var SVG_NS = 'http://www.w3.org/2000/svg';
+    var icon = document.createElementNS(SVG_NS, 'svg');
     icon.setAttribute('viewBox', '0 0 24 24');
     icon.setAttribute('fill', 'none');
     icon.setAttribute('stroke', 'currentColor');
     icon.setAttribute('stroke-width', '2');
     icon.setAttribute('stroke-linecap', 'round');
     icon.setAttribute('stroke-linejoin', 'round');
-    icon.innerHTML = '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>';
+
+    var path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z');
+    icon.appendChild(path);
+
+    var polyline = document.createElementNS(SVG_NS, 'polyline');
+    polyline.setAttribute('points', '14 2 14 8 20 8');
+    icon.appendChild(polyline);
+
     return icon;
   }
 
