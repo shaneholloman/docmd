@@ -49,6 +49,57 @@ function deepWipe() {
 // 1. Initial Reporting
 run('node scripts/status.js start:reset', false);
 
+// 1a. Lint gate — capture eslint JSON, summarise in TUI style, fail
+// fast on errors. Output is silent; developer runs `pnpm lint`
+// directly to see the full file-by-file breakdown.
+function runLint() {
+    const cyan   = (t) => `\x1b[36m${t}\x1b[0m`;
+    const green  = (t) => `\x1b[32m${t}\x1b[0m`;
+    const yellow = (t) => `\x1b[33m${t}\x1b[0m`;
+    const red    = (t) => `\x1b[31m${t}\x1b[0m`;
+    const dim    = (t) => `\x1b[2m${t}\x1b[0m`;
+
+    let stdout = '';
+    try {
+        stdout = execSync('pnpm -s exec eslint . --format json', {
+            stdio: ['ignore', 'pipe', 'pipe'],
+            maxBuffer: 64 * 1024 * 1024
+        }).toString();
+    } catch (e) {
+        // eslint exits non-zero on errors — the JSON is still on stdout
+        if (e.stdout) stdout = e.stdout.toString();
+    }
+
+    let errors = 0, warnings = 0;
+    try {
+        const results = JSON.parse(stdout || '[]');
+        for (const file of results) {
+            for (const msg of file.messages || []) {
+                if (msg.severity === 2) errors++;
+                else if (msg.severity === 1) warnings++;
+            }
+        }
+    } catch (_) {
+        // malformed output — leave counts at 0
+    }
+
+    console.log(`\n${cyan('┌─ Lint')}`);
+    if (errors > 0) {
+        console.log(`${cyan('│')}  ${red('[ FAIL ]')} ${red(`${errors} error${errors === 1 ? '' : 's'}`)}`);
+        console.log(`${cyan('│')}`);
+        console.log(`${cyan('│')}  ${dim('Run `pnpm lint` to see the full output.')}`);
+    } else {
+        console.log(`${cyan('│')}  ${green('[ PASS ]')} ${green('0 errors')}`);
+    }
+    if (warnings > 0) {
+        console.log(`${cyan('│')}  ${yellow('[ WARN ]')} ${yellow(`${warnings} warning${warnings === 1 ? '' : 's'}`)}`);
+    }
+    console.log(`${cyan('└──────────────────────────────────────────────────────────')}\n`);
+
+    if (errors > 0) process.exit(1);
+}
+runLint();
+
 // 2. Stop any running servers
 process.stdout.write(`\x1b[36m│\x1b[0m  \x1b[2mStopping active servers\x1b[0m`.padEnd(45));
 run('pnpm -s stop');
